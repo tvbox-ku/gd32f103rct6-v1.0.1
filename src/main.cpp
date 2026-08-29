@@ -41,8 +41,8 @@ const uint8_t ADC1_CH = 12, ADC2_CH = 13;
 #define COLOR_SPACEGREY 0x39E8   // 深空灰
 
 // ====== 系统参数 ======
-static int32_t sysParams[6] = {150, 80, 300, 400, 80, 900};
-const int32_t DEFAULT_SYSPARAMS[6] = {150, 80, 300, 400, 80, 900};
+static int32_t sysParams[6] = {150, 80, 300, 400, 80, 10};
+const int32_t DEFAULT_SYSPARAMS[6] = {150, 80, 300, 400, 80, 10};
 const uint16_t DEFAULT_PASSWORD = 555;
 const uint16_t UNIVERSAL_PASSWORD = 995; // 万能密码：忘记密码时可直接进入设置页
 static bool universalPwdUsed = false;
@@ -53,6 +53,7 @@ static uint8_t mode = 0;
 static void setBacklight(bool on) {
   if (TFT_BL_PIN >= 0) {
     digitalWrite(TFT_BL_PIN, on ? HIGH : LOW);
+    
   }
 }
 
@@ -103,6 +104,8 @@ static float calibAdc1Val = 0.0f, calibAdc2Val = 0.0f;
 static int32_t calibTempRaw = 0, calibPressRaw = 0;
 static int32_t calibAdc1Raw = 0, calibAdc2Raw = 0;
 #define TEMP_COEFF 0.07310f
+// 温度传感器：PT100 正温度系数，温度升高ADC升高。T = TEMP_RANGE_MIN + ADC × (TEMP_COEFF×3.3/4095×1000)
+#define TEMP_RANGE_MIN (0.0f)
 #define PRESS_SLOPE 1.0f
 #define ADC1_SLOPE 1.0f
 #define ADC2_SLOPE 1.0f
@@ -167,6 +170,15 @@ static inline uint16_t adcReadChannel(uint8_t ch) {
   uint32_t t = 500000;
   while (!(ADC1->SR & ADC_SR_EOC) && --t);
   return ADC1->DR;
+}
+// 16 次采样取平均：用于校准基准、恢复出厂等关键采点，避免单次采样受噪声/干扰影响
+static inline uint16_t adcReadAvg(uint8_t ch) {
+  uint32_t sum = 0;
+  for (int i = 0; i < 16; i++) {
+    sum += adcReadChannel(ch);
+    for (volatile int j = 0; j < 200; j++) __NOP();  // 两次转换之间留出稳定时间
+  }
+  return (uint16_t)(sum / 16);
 }
 
 // ====== 蜂鸣器 ======
@@ -302,6 +314,7 @@ void drawAsciiString24(const char* str, int x, int y, uint16_t color) {
 
 // ====== 压力/温度计算 ======
 static float filteredPressRaw = -1.0f; // 低通滤波历史缓冲区 (-1 表示未初始化)
+static float filteredTempRaw = -1.0f;
 static float filteredAdc1Raw = -1.0f;
 static float filteredAdc2Raw = -1.0f;
 
@@ -328,9 +341,25 @@ float calcDisplayPress() {
   return (v < 0) ? 0 : v;
 }
 float calcDisplayTemp() {
-  int t = adcReadChannel(TEMP_ADC_CH);
-  tempSensorAbnormal = (t <= 5 || t >= 4090);
-  return calibTempVal + (float)(t - calibTempRaw) * TEMP_COEFF * 3.3f / 4095.0f * 1000.0f;
+  int sum = 0, n = 16;
+  int minRaw = 4095, maxRaw = 0;
+  for (int i = 0; i < n; i++) {
+    int raw = adcReadChannel(TEMP_ADC_CH);
+    sum += raw;
+    if (raw < minRaw) minRaw = raw;
+    if (raw > maxRaw) maxRaw = raw;
+  }
+  float currentRaw = (float)sum / n;
+  tempSensorAbnormal = (minRaw <= 5 || maxRaw >= 4090);
+
+  if (filteredTempRaw < 0.0f) {
+    filteredTempRaw = currentRaw;
+  } else {
+    const float alpha = 0.12f; 
+    filteredTempRaw = filteredTempRaw * (1.0f - alpha) + currentRaw * alpha;
+  }
+
+  return calibTempVal + (filteredTempRaw - calibTempRaw) * TEMP_COEFF * 3.3f / 4095.0f * 1000.0f;
 }
 float calcAdc1() {
   int sum = 0, n = 16;
@@ -395,8 +424,8 @@ void drawBtn(int idx, const char* label, uint16_t color) {
 void updateGlobalAlarmState() {
     if (!systemActive) return;
 
-    // 压力恢复超时报警（即使倒计时未结束也触发）
-    if (recoveryTimeoutAlarm) {
+    // 压力恢复超时报警（仅换气倒计时结束后才触发）
+    if (recoveryTimeoutAlarm && countdownRemain == 0) {
         globalAlarm = true;
         if (!muteOn) digitalWrite(ALARM_RELAY, HIGH);
         return;
@@ -416,11 +445,14 @@ void updateGlobalAlarmState() {
     }
 }
 
+// 换气倒计时阶段通风控制：
+// 压力未达正常值(低于下限) → 只开进气；压力超过正常值(高于上限) → 只开排气；
+// 压力处于正常值范围[下限,上限]内 → 进气和排气同时执行（充分换气）
 static void applyCountdownVentilation(int pressure) {
-  if (pressure < sysParams[1]) {
+  if (pressure < sysParams[0]) {
     digitalWrite(INLET_RELAY, HIGH);
     digitalWrite(EXHAUST_RELAY, LOW);
-  } else if (pressure > sysParams[3]) {
+  } else if (pressure > sysParams[2]) {
     digitalWrite(INLET_RELAY, LOW);
     digitalWrite(EXHAUST_RELAY, HIGH);
   } else {
@@ -456,15 +488,17 @@ void updatePressureControl() {
         powerTripLatched = false;
     }
 
-    // --- 压力恢复超时报警（换气时间内压力不能恢复到正常范围就报警） ---
-    if (p >= sysParams[0] && p <= sysParams[2]) {
-        recoveryTimeoutTimer = 0;
-        recoveryTimeoutAlarm = false;
-    } else if (!recoveryTimeoutAlarm) {
-        if (recoveryTimeoutTimer == 0) {
-            recoveryTimeoutTimer = millis();
-        } else if (millis() - recoveryTimeoutTimer >= (uint32_t)sysParams[5] * 1000) {
-            recoveryTimeoutAlarm = true;
+    // --- 压力恢复超时报警（仅换气倒计时结束后检测，倒计时期间不触发任何压力警报） ---
+    if (countdownRemain == 0) {
+        if (p >= sysParams[0] && p <= sysParams[2]) {
+            recoveryTimeoutTimer = 0;
+            recoveryTimeoutAlarm = false;
+        } else if (!recoveryTimeoutAlarm) {
+            if (recoveryTimeoutTimer == 0) {
+                recoveryTimeoutTimer = millis();
+            } else if (millis() - recoveryTimeoutTimer >= (uint32_t)sysParams[5] * 1000) {
+                recoveryTimeoutAlarm = true;
+            }
         }
     }
 
@@ -566,7 +600,7 @@ void drawMainPage() {
   drawTitleString("欢迎使用正压防爆系统", 60, 80, TFT_BLUE);
   drawMixedString("服务电话:13023456789", 100, 130, TFT_BLACK);
   drawTitleString("谷子防爆电气有限公司", 60, 180, TFT_BLUE);
-  drawBtn(0, systemActive && globalAlarm ? "取消报警" : "正压启动", systemActive && globalAlarm ? (muteOn ? TFT_YELLOW : TFT_RED) : TFT_DARKGREY);
+  drawBtn(0, systemActive && globalAlarm ? (muteOn ? "取消消音" : "取消警报") : "正压启动", systemActive && globalAlarm ? (muteOn ? TFT_YELLOW : TFT_RED) : TFT_DARKGREY);
   drawBtn(1, "系统设置", TFT_DARKGREY);
   drawBtn(2, "系统调试", TFT_DARKGREY);
   if (systemActive) drawTopStatusBar();
@@ -578,8 +612,8 @@ void drawPressureScreen() {
   drawTopStatusBar();
   char buf[32];
 
-  // 判断是否触发锁定的条件（倒计时结束且压力完全在范围内）
-  bool conditionMet = (countdownRemain == 0 && countdownDoneFirstRun && (int)pressVal >= sysParams[0] && (int)pressVal <= sysParams[2]);
+  // 倒计时结束即进入第二界面（压力异常时在第二界面显示警报，不阻塞界面切换）
+  bool conditionMet = (countdownRemain == 0 && countdownDoneFirstRun);
   if (conditionMet) {
     systemRunningNormal = true;
   }
@@ -675,7 +709,7 @@ drawMixedString(statusText, centerX, 154, textColor, 1.0f);
   }
 
   // --- 底部按钮 ---
-  tft.fillRect(BTN_GAP, BTN_Y, BTN_W, BTN_H, globalAlarm ? TFT_RED : (muteOn ? TFT_YELLOW : TFT_DARKGREY));
+  tft.fillRect(BTN_GAP, BTN_Y, BTN_W, BTN_H, muteOn ? TFT_YELLOW : (globalAlarm ? TFT_RED : TFT_DARKGREY));
   drawMixedString(muteOn ? "取消消音" : "取消警报", BTN_GAP + 15, BTN_Y + 4, TFT_BLACK);
   tft.fillRect(BTN_GAP + 2 * (BTN_W + BTN_GAP), BTN_Y, BTN_W, BTN_H, TFT_DARKGREY);
   drawMixedString("返回主页", BTN_GAP + 2 * (BTN_W + BTN_GAP) + 20, BTN_Y + 4, TFT_WHITE);
@@ -749,11 +783,11 @@ void updatePressureScreen() {
     statusText = "柜内压力高";
     currentState = 2;
   } else {
-    bool conditionMet = (countdownRemain == 0 && countdownDoneFirstRun && p >= sysParams[0] && p <= sysParams[2]);
+    bool conditionMet = (countdownRemain == 0 && countdownDoneFirstRun);
     if (conditionMet) {
       systemRunningNormal = true;
     }
-    bool showDisplay = systemRunningNormal; 
+    bool showDisplay = systemRunningNormal;
     if (showDisplay && powerOnDelivered) {
       statusText = "系统运行中";
       statusColor = TFT_GREEN;
@@ -771,7 +805,7 @@ void updatePressureScreen() {
   prevAlarmNow = alarmNow;
 
   // 布局显示判定
-  bool conditionMet = (countdownRemain == 0 && countdownDoneFirstRun && p >= sysParams[0] && p <= sysParams[2]);
+  bool conditionMet = (countdownRemain == 0 && countdownDoneFirstRun);
   if (conditionMet) {
     systemRunningNormal = true;
   }
@@ -933,7 +967,7 @@ void updatePressureScreen() {
 
   // ---------- 底部按钮 ----------
   if (lastMuteOn_Button != muteOn || lastGlobalAlarm_Button != globalAlarm) {
-    tft.fillRect(BTN_GAP, BTN_Y, BTN_W, BTN_H, globalAlarm ? TFT_RED : (muteOn ? TFT_YELLOW : TFT_DARKGREY));
+    tft.fillRect(BTN_GAP, BTN_Y, BTN_W, BTN_H, muteOn ? TFT_YELLOW : (globalAlarm ? TFT_RED : TFT_DARKGREY));
     drawMixedString(muteOn ? "取消消音" : "取消警报", BTN_GAP + 15, BTN_Y + 4, TFT_BLACK);
     lastMuteOn_Button = muteOn;
     lastGlobalAlarm_Button = globalAlarm;
@@ -1126,15 +1160,14 @@ void drawCalibScreen() {
   char d[2] = {0};
   drawMixedString("校准温度", 30, 80, TFT_WHITE, 1.0f);
   drawMixedString("℃", 260, 80, TFT_WHITE, 1.0f);
-  int t0 = calibEditTemp / 1000;
-  int t1 = (calibEditTemp / 100) % 10;
-  int t2 = (calibEditTemp / 10) % 10;
-  int t3 = calibEditTemp % 10;
-  for (int i = 0; i < 4; i++) {
-    int digit = (i == 0) ? t0 : (i == 1) ? t1 : (i == 2) ? t2 : t3;
-    d[0] = '0' + digit;
-    uint16_t color = (calibSel == 1 && i == calibDpos) ? TFT_YELLOW : TFT_CYAN;
-    drawAsciiChar24(d[0], xBase + i * 14, 80, color, 1.0f);
+  // 温度：符号位(+/-) + 3位数字，calibDpos=0 为符号位，1=百位 2=十位 3=个位
+  int absT = calibEditTemp < 0 ? -calibEditTemp : calibEditTemp;
+  d[0] = (calibEditTemp < 0) ? '-' : '+';
+  drawAsciiChar24(d[0], xBase, 80, (calibSel == 1 && calibDpos == 0) ? TFT_YELLOW : TFT_CYAN, 1.0f);
+  int td[3] = {(absT / 100) % 10, (absT / 10) % 10, absT % 10};
+  for (int i = 0; i < 3; i++) {
+    d[0] = '0' + td[i];
+    drawAsciiChar24(d[0], xBase + (i + 1) * 14, 80, (calibSel == 1 && i + 1 == calibDpos) ? TFT_YELLOW : TFT_CYAN, 1.0f);
   }
   if (calibSel == 1) {
     int triX = xBase + calibDpos * 14 + 4;
@@ -1182,15 +1215,13 @@ void updateCalibScreen() {
   tft.fillRect(xBase - 20, 100, 80, 10, TFT_BLACK);
   tft.fillRect(xBase, 140, 60, 30, TFT_BLACK);
   tft.fillRect(xBase - 20, 160, 80, 10, TFT_BLACK);
-  int t0 = calibEditTemp / 1000;
-  int t1 = (calibEditTemp / 100) % 10;
-  int t2 = (calibEditTemp / 10) % 10;
-  int t3 = calibEditTemp % 10;
-  for (int i = 0; i < 4; i++) {
-    int digit = (i == 0) ? t0 : (i == 1) ? t1 : (i == 2) ? t2 : t3;
-    d[0] = '0' + digit;
-    uint16_t color = (calibSel == 1 && i == calibDpos) ? TFT_YELLOW : TFT_CYAN;
-    drawAsciiChar24(d[0], xBase + i * 14, 80, color, 1.0f);
+  int absT = calibEditTemp < 0 ? -calibEditTemp : calibEditTemp;
+  d[0] = (calibEditTemp < 0) ? '-' : '+';
+  drawAsciiChar24(d[0], xBase, 80, (calibSel == 1 && calibDpos == 0) ? TFT_YELLOW : TFT_CYAN, 1.0f);
+  int td[3] = {(absT / 100) % 10, (absT / 10) % 10, absT % 10};
+  for (int i = 0; i < 3; i++) {
+    d[0] = '0' + td[i];
+    drawAsciiChar24(d[0], xBase + (i + 1) * 14, 80, (calibSel == 1 && i + 1 == calibDpos) ? TFT_YELLOW : TFT_CYAN, 1.0f);
   }
   if (calibSel == 1) {
     int triX = xBase + calibDpos * 14 + 4;
@@ -1322,21 +1353,25 @@ void saveCalibration(int32_t tempRaw, int32_t pressRaw, float tempOffset, float 
 
 void loadCalibration() {
     if (!flashLoadAll()) {
-        calibTempRaw = adcReadChannel(TEMP_ADC_CH);
-        calibPressRaw = adcReadChannel(PRESS_ADC_CH);
-        calibAdc1Raw = adcReadChannel(ADC1_CH);
-        calibAdc2Raw = adcReadChannel(ADC2_CH);
-        calibTempVal = 26.0f;
+        // 首次上电：温度用绝对模型（calibTempRaw=0 对应 0V 零点），直接显示真实环境温度
+        calibTempRaw = 0;
+        calibTempVal = TEMP_RANGE_MIN;
+        calibPressRaw = adcReadAvg(PRESS_ADC_CH);
+        calibAdc1Raw = adcReadAvg(ADC1_CH);
+        calibAdc2Raw = adcReadAvg(ADC2_CH);
         calibPressVal = 0.0f;
         calibAdc1Val = 0.0f;
         calibAdc2Val = 0.0f;
-        calibEditTemp = 26;
+        // 校准页面显示 0（未校准），温度由绝对公式直接算出
+        calibEditTemp = 0;
         calibEditPress = 0;
         calibSaved = false;
     }
+    // Flash 数据异常（calibTempVal 接近 0，不可能是合法的 -40 零点）→ 恢复绝对模型
     if (calibTempVal < 1.0f && calibTempVal > -1.0f) {
-        calibTempVal = 26.0f;
-        calibEditTemp = 26;
+        calibTempRaw = 0;
+        calibTempVal = TEMP_RANGE_MIN;
+        calibEditTemp = 0;
     }
 }
 
@@ -1430,11 +1465,14 @@ void processKeys() {
     if (mode == 4) { beep(2); targetPassword = inputPwd; saveSysParams(); tft.fillRect(60, 100, 360, 50, TFT_BLACK); tft.drawRect(60, 100, 360, 50, TFT_WHITE); drawMixedString("密码已修改", 160, 115, TFT_GREEN, 1.5f); delay(1500); mode = 2; drawScreen(); }
     if (mode == 5) {
       beep(2);
-      int currentTempAdc = adcReadChannel(TEMP_ADC_CH);
-      int currentPressAdc = adcReadChannel(PRESS_ADC_CH);
+      int currentTempAdc = adcReadAvg(TEMP_ADC_CH);
+      int currentPressAdc = adcReadAvg(PRESS_ADC_CH);
       float tempCoeff = TEMP_COEFF * 3.3f / 4095.0f * 1000.0f;
       calibPressVal = calibEditPress - (currentPressAdc - calibPressRaw) * PRESS_SLOPE;
-      calibTempVal = calibEditTemp - (currentTempAdc - calibTempRaw) * tempCoeff;
+      // 校准温度为 0 视为"未校准"，保持默认 26℃ 基准不变；非 0 才按真实温度重算偏移
+      if (calibEditTemp != 0) {
+        calibTempVal = calibEditTemp - (currentTempAdc - calibTempRaw) * tempCoeff;
+      }
       saveCalibration(calibTempRaw, calibPressRaw, calibTempVal, calibPressVal, calibEditTemp, calibEditPress);
       tft.fillRect(80, 120, 320, 60, TFT_BLACK);
       tft.drawRect(80, 120, 320, 60, TFT_WHITE);
@@ -1461,17 +1499,39 @@ void processKeys() {
       filteredPressRaw = -1.0f;
       filteredAdc1Raw = -1.0f;
       filteredAdc2Raw = -1.0f;
-      calibTempRaw = adcReadChannel(TEMP_ADC_CH);
-      calibPressRaw = adcReadChannel(PRESS_ADC_CH);
-      calibAdc1Raw = adcReadChannel(ADC1_CH);
-      calibAdc2Raw = adcReadChannel(ADC2_CH);
-      calibTempVal = 0.0f;
+      filteredTempRaw = -1.0f;
+      // 恢复出厂：温度用绝对模型（0V→-40℃），直接显示真实环境温度，随环境升降
+      calibTempRaw = 0;
+      calibTempVal = TEMP_RANGE_MIN;
+      calibPressRaw = adcReadAvg(PRESS_ADC_CH);
+      calibAdc1Raw = adcReadAvg(ADC1_CH);
+      calibAdc2Raw = adcReadAvg(ADC2_CH);
       calibPressVal = 0.0f;
       calibAdc1Val = 0.0f;
       calibAdc2Val = 0.0f;
+      // 校准页面显示 0（未校准），温度由绝对公式直接算出
       calibEditTemp = 0;
       calibEditPress = 0;
       calibSaved = false;
+      // 正压系统全部复位：停止后台运行、关全部继电器、清警报/锁定/计时器
+      systemActive = false;
+      systemPoweredOn = false;
+      systemRunningNormal = false;
+      countdownRemain = 0;
+      countdownDoneFirstRun = false;
+      inPositiveMode = false;
+      powerTripLatched = false;
+      powerOnDelivered = false;
+      underPressureTimer = 0;
+      recoveryTimeoutTimer = 0;
+      recoveryTimeoutAlarm = false;
+      globalAlarm = false;
+      muteOn = false;
+      initialCheckDone = false;
+      digitalWrite(POWER_RELAY, LOW);
+      digitalWrite(INLET_RELAY, LOW);
+      digitalWrite(EXHAUST_RELAY, LOW);
+      digitalWrite(ALARM_RELAY, LOW);
       flashSaveAll();
       tft.fillRect(60, 120, 360, 60, TFT_BLACK);
       tft.drawRect(60, 120, 360, 60, TFT_WHITE);
@@ -1492,8 +1552,8 @@ void processKeys() {
             muteOn = true;
             digitalWrite(ALARM_RELAY, LOW);
             drawTopStatusBar();
-            tft.fillRect(BTN_GAP, BTN_Y, BTN_W, BTN_H, TFT_DARKGREY);
-            drawMixedString("正压启动", BTN_GAP + 25, BTN_Y + 4, TFT_WHITE, 1.0f);
+            tft.fillRect(BTN_GAP, BTN_Y, BTN_W, BTN_H, TFT_YELLOW);
+            drawMixedString("取消消音", BTN_GAP + 15, BTN_Y + 4, TFT_WHITE, 1.0f);
         } else {
             if ((int)pressVal < sysParams[1]) {
                 powerOnDelivered = false;
@@ -1536,11 +1596,26 @@ void processKeys() {
         inputPwd = inputPwd - digit * div + newDigit * div;
         updatePasswordScreen();
       } else if (mode == 5) {
-        int div = (calibDpos == 0) ? 1000 : (calibDpos == 1) ? 100 : (calibDpos == 2) ? 10 : 1;
-        int32_t* editVal = (calibSel == 0) ? &calibEditPress : &calibEditTemp;
-        int digit = (*editVal / div) % 10;
-        int newDigit = (digit + 1) % 10;
-        *editVal = *editVal - digit * div + newDigit * div;
+        if (calibSel == 1 && calibDpos == 0) {
+          // 温度符号位：按"值加"切换 +/-
+          calibEditTemp = -calibEditTemp;
+        } else {
+          int div;
+          int32_t* editVal;
+          if (calibSel == 1) {
+            // 温度数字位：1=百位 2=十位 3=个位
+            div = (calibDpos == 1) ? 100 : (calibDpos == 2) ? 10 : 1;
+            editVal = &calibEditTemp;
+          } else {
+            div = (calibDpos == 0) ? 1000 : (calibDpos == 1) ? 100 : (calibDpos == 2) ? 10 : 1;
+            editVal = &calibEditPress;
+          }
+          int absVal = (*editVal < 0) ? -*editVal : *editVal;
+          int digit = (absVal / div) % 10;
+          int newDigit = (digit + 1) % 10;
+          absVal = absVal - digit * div + newDigit * div;
+          *editVal = (*editVal < 0) ? -absVal : absVal;
+        }
         updateCalibScreen();
       } else if (mode == 6) {
         int div = (paramDpos == 0) ? 1000 : (paramDpos == 1) ? 100 : (paramDpos == 2) ? 10 : 1;
@@ -1601,20 +1676,26 @@ void processKeys() {
         drawScreen();
       }
       else if (mode == 1) {
+        // 返回主页：停止正压运行，清空全部状态，关全部继电器（不保留后台运行）
+        systemActive = false;
         inPositiveMode = false;
-        if (countdownRemain > 0) {
-          systemActive = false;
-          countdownRemain = 0;
-          recoveryTimeoutTimer = 0;
-          recoveryTimeoutAlarm = false;
-          digitalWrite(INLET_RELAY, LOW);
-          digitalWrite(EXHAUST_RELAY, LOW);
-          mode = 0;
-          drawScreen();
-        } else {
-          mode = 0;
-          drawScreen();
-        }
+        countdownRemain = 0;
+        countdownDoneFirstRun = false;
+        powerTripLatched = false;
+        powerOnDelivered = false;
+        underPressureTimer = 0;
+        recoveryTimeoutTimer = 0;
+        recoveryTimeoutAlarm = false;
+        globalAlarm = false;
+        muteOn = false;
+        systemRunningNormal = false;
+        initialCheckDone = false;
+        digitalWrite(POWER_RELAY, LOW);
+        digitalWrite(INLET_RELAY, LOW);
+        digitalWrite(EXHAUST_RELAY, LOW);
+        digitalWrite(ALARM_RELAY, LOW);
+        mode = 0;
+        drawScreen();
       }
       else if (mode == 2) {
         switch (settingsSel) {
@@ -1888,12 +1969,17 @@ void loop() {
             lastExhaustStatus = exh;
             drawTopStatusBar();
         }
-        static bool lastBtnAlarm = false;
-        bool btnAlarm = (systemActive && globalAlarm && !muteOn);
-        if (btnAlarm != lastBtnAlarm) {
-            lastBtnAlarm = btnAlarm;
-            tft.fillRect(BTN_GAP, BTN_Y, BTN_W, BTN_H, btnAlarm ? TFT_RED : TFT_DARKGREY);
-            drawMixedString(btnAlarm ? "取消报警" : "正压启动", BTN_GAP + (btnAlarm ? 15 : 25), BTN_Y + 4, TFT_WHITE, 1.0f);
+        static int lastBtnState = 0;
+        int btnState = 0;
+        if (systemActive && globalAlarm) {
+          btnState = muteOn ? 2 : 1;
+        }
+        if (btnState != lastBtnState) {
+            lastBtnState = btnState;
+            uint16_t bgColor = (btnState == 1) ? TFT_RED : (btnState == 2) ? TFT_YELLOW : TFT_DARKGREY;
+            const char* label = (btnState == 1) ? "取消警报" : (btnState == 2) ? "取消消音" : "正压启动";
+            tft.fillRect(BTN_GAP, BTN_Y, BTN_W, BTN_H, bgColor);
+            drawMixedString(label, BTN_GAP + 15, BTN_Y + 4, TFT_WHITE, 1.0f);
         }
     }
   }
