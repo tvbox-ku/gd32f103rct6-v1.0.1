@@ -113,6 +113,7 @@ static int32_t calibAdc1Raw = 0, calibAdc2Raw = 0;
 // ====== 校准界面变量 ======
 static uint8_t calibSel = 0, calibDpos = 0;
 static int32_t calibEditTemp = 0, calibEditPress = 0;
+static bool calibTempNeg = false; // 温度符号（独立标志，支持 0 的正负切换）
 // 进入校准页时备份的初始值，放弃时恢复到此值而非清零
 static int32_t calibInitTemp = 0, calibInitPress = 0;
 
@@ -333,7 +334,7 @@ float calcDisplayPress() {
   if (filteredPressRaw < 0.0f) {
     filteredPressRaw = currentRaw;
   } else {
-    const float alpha = 0.12f; 
+    const float alpha = 0.35f; 
     filteredPressRaw = filteredPressRaw * (1.0f - alpha) + currentRaw * alpha;
   }
 
@@ -1162,7 +1163,7 @@ void drawCalibScreen() {
   drawMixedString("℃", 260, 80, TFT_WHITE, 1.0f);
   // 温度：符号位(+/-) + 3位数字，calibDpos=0 为符号位，1=百位 2=十位 3=个位
   int absT = calibEditTemp < 0 ? -calibEditTemp : calibEditTemp;
-  d[0] = (calibEditTemp < 0) ? '-' : '+';
+  d[0] = calibTempNeg ? '-' : '+';
   drawAsciiChar24(d[0], xBase, 80, (calibSel == 1 && calibDpos == 0) ? TFT_YELLOW : TFT_CYAN, 1.0f);
   int td[3] = {(absT / 100) % 10, (absT / 10) % 10, absT % 10};
   for (int i = 0; i < 3; i++) {
@@ -1216,7 +1217,7 @@ void updateCalibScreen() {
   tft.fillRect(xBase, 140, 60, 30, TFT_BLACK);
   tft.fillRect(xBase - 20, 160, 80, 10, TFT_BLACK);
   int absT = calibEditTemp < 0 ? -calibEditTemp : calibEditTemp;
-  d[0] = (calibEditTemp < 0) ? '-' : '+';
+  d[0] = calibTempNeg ? '-' : '+';
   drawAsciiChar24(d[0], xBase, 80, (calibSel == 1 && calibDpos == 0) ? TFT_YELLOW : TFT_CYAN, 1.0f);
   int td[3] = {(absT / 100) % 10, (absT / 10) % 10, absT % 10};
   for (int i = 0; i < 3; i++) {
@@ -1430,11 +1431,11 @@ void processKeys() {
   // 长按
   if (k1 == LOW && !k1LongFired && now - k1PressTime >= KEY_LONG_PRESS_MS) {
     k1LongFired = true;
-    if (mode == 4) { beep(2); mode = 2; drawScreen(); }
-    else if (mode == 8) { beep(2); mode = 0; drawScreen(); }
+    if (mode == 8) { beep(2); mode = 0; drawScreen(); }
   }
   if (k2 == LOW && !k2LongFired && now - k2PressTime >= KEY_LONG_PRESS_MS) {
     k2LongFired = true;
+    if (mode == 4) { beep(2); mode = 2; drawScreen(); }
     if (mode == 5) {
       beep(2);
       calibEditTemp = calibInitTemp;
@@ -1598,7 +1599,7 @@ void processKeys() {
       } else if (mode == 5) {
         if (calibSel == 1 && calibDpos == 0) {
           // 温度符号位：按"值加"切换 +/-
-          calibEditTemp = -calibEditTemp;
+          calibTempNeg = !calibTempNeg;
         } else {
           int div;
           int32_t* editVal;
@@ -1614,7 +1615,7 @@ void processKeys() {
           int digit = (absVal / div) % 10;
           int newDigit = (digit + 1) % 10;
           absVal = absVal - digit * div + newDigit * div;
-          *editVal = (*editVal < 0) ? -absVal : absVal;
+          *editVal = (calibSel == 1 && calibTempNeg) ? -absVal : absVal;
         }
         updateCalibScreen();
       } else if (mode == 6) {
@@ -1703,6 +1704,7 @@ void processKeys() {
           case 1:
             calibSel = 1;
             calibDpos = 0;
+            calibTempNeg = (calibEditTemp < 0);
             calibInitTemp = calibEditTemp;
             calibInitPress = calibEditPress;
             mode = 5;
