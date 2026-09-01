@@ -446,13 +446,31 @@ void updateGlobalAlarmState() {
 // 换气倒计时阶段通风控制：
 // 压力未达正常值(低于下限) → 只开进气；压力超过正常值(高于上限) → 只开排气；
 // 压力处于正常值范围[下限,上限]内 → 进气和排气同时执行（充分换气）
+static bool countdownOverPressure = false;  // 倒计时超压排气状态
+static bool countdownUnderPressure = false; // 倒计时欠压补气状态
+
 static void applyCountdownVentilation(int pressure) {
-  if (pressure < sysParams[0]) {
-    digitalWrite(INLET_RELAY, HIGH);
-    digitalWrite(EXHAUST_RELAY, LOW);
-  } else if (pressure > sysParams[2]) {
+  int midPressure = (sysParams[0] + sysParams[2]) / 2;
+
+  if (pressure > sysParams[2]) {
+    countdownOverPressure = true;
+  } else if (pressure < sysParams[1]) {
+    countdownUnderPressure = true;
+  }
+
+  if (countdownOverPressure && pressure <= midPressure) {
+    countdownOverPressure = false;
+  }
+  if (countdownUnderPressure && pressure >= midPressure) {
+    countdownUnderPressure = false;
+  }
+
+  if (countdownOverPressure) {
     digitalWrite(INLET_RELAY, LOW);
     digitalWrite(EXHAUST_RELAY, HIGH);
+  } else if (countdownUnderPressure) {
+    digitalWrite(INLET_RELAY, HIGH);
+    digitalWrite(EXHAUST_RELAY, LOW);
   } else {
     digitalWrite(INLET_RELAY, HIGH);
     digitalWrite(EXHAUST_RELAY, HIGH);
