@@ -1477,10 +1477,8 @@ void processKeys() {
       int currentPressAdc = adcReadAvg(PRESS_ADC_CH);
       float tempCoeff = TEMP_COEFF * 3.3f / 4095.0f * 1000.0f;
       calibPressVal = calibEditPress - (currentPressAdc - calibPressRaw) * PRESS_SLOPE;
-      // 校准温度为 0 视为"未校准"，保持默认 26℃ 基准不变；非 0 才按真实温度重算偏移
-      if (calibEditTemp != 0) {
-        calibTempVal = calibEditTemp - (currentTempAdc - calibTempRaw) * tempCoeff;
-      }
+      // 温度校准：按用户设定值重算偏移（0度就是校准到0度，恢复默认请用"恢复出厂"）
+      calibTempVal = calibEditTemp - (currentTempAdc - calibTempRaw) * tempCoeff;
       saveCalibration(calibTempRaw, calibPressRaw, calibTempVal, calibPressVal, calibEditTemp, calibEditPress);
       tft.fillRect(80, 120, 320, 60, TFT_BLACK);
       tft.drawRect(80, 120, 320, 60, TFT_WHITE);
