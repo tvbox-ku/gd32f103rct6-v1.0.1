@@ -96,6 +96,9 @@ static bool recoveryTimeoutAlarm = false;   // 压力恢复超时报警标记
 
 // ====== 压力滞后防抖 ======
 #define PRESS_HYSTERESIS 15      // 滞后范围（Pa）
+#define UNDER_EXIT_PCT  60    // 补气解除点：下限+60%×(上限-下限)=240Pa（倒计时与运行稳压共用）
+#define OVER_EXIT_PCT   50    // 排气解除点：下限+50%×(上限-下限)=225Pa（倒计时与运行稳压共用）
+#define RECOVERY_TIMEOUT_MS 10000 // 换气结束后压力恢复超时（毫秒），独立于换气时间参数
 static int32_t lastPressState = 0; // 0=正常, -1=低, 1=高
 
 // ====== 校准 ======
@@ -444,24 +447,35 @@ void updateGlobalAlarmState() {
 }
 
 // 换气倒计时阶段通风控制：
-// 压力未达正常值(低于下限) → 只开进气；压力超过正常值(高于上限) → 只开排气；
+// 压力低于下限 → 只开进气；压力超过上限 → 只开排气；
 // 压力处于正常值范围[下限,上限]内 → 进气和排气同时执行（充分换气）
+// 滞后解除点按区间比例回落（自适应参数）：
+//   欠压补气 →补到 下限+60%×(上限-下限) 即恢复双开吹扫
+//   超压排气 →排到 下限+50%×(上限-下限) 即恢复双开吹扫
 static bool countdownOverPressure = false;  // 倒计时超压排气状态
 static bool countdownUnderPressure = false; // 倒计时欠压补气状态
 
+// 复位滞后状态：正压启动/退出/恢复出厂时调用，防止残留状态污染下一次换气
+static void resetCountdownVentilationState() {
+  countdownOverPressure = false;
+  countdownUnderPressure = false;
+}
+
 static void applyCountdownVentilation(int pressure) {
-  int midPressure = (sysParams[0] + sysParams[2]) / 2;
+  int span = sysParams[2] - sysParams[0];                              // 压力区间宽度
+  int underExit = sysParams[0] + span * UNDER_EXIT_PCT / 100;          // 补气解除点(60%=240)
+  int overExit  = sysParams[0] + span * OVER_EXIT_PCT / 100;           // 排气解除点(50%=225)
 
   if (pressure > sysParams[2]) {
     countdownOverPressure = true;
-  } else if (pressure < sysParams[1]) {
+  } else if (pressure < sysParams[0]) {
     countdownUnderPressure = true;
   }
 
-  if (countdownOverPressure && pressure <= midPressure) {
+  if (countdownOverPressure && pressure <= overExit) {
     countdownOverPressure = false;
   }
-  if (countdownUnderPressure && pressure >= midPressure) {
+  if (countdownUnderPressure && pressure >= underExit) {
     countdownUnderPressure = false;
   }
 
@@ -482,11 +496,15 @@ void updatePressureControl() {
     if (!systemActive) return;
 
     int p = (int)pressVal;
-    static bool isFilling = false; 
+    static bool isFilling = false;
 
-    // ====== 关键：动态计算 50% 中点，不管数值多少 ======
-    int targetPressure = (sysParams[0] + sysParams[2]) / 2; 
-    // ===================================================
+    // ====== 运行稳压目标点（与倒计时阶段共用比例解除点） ======
+    // 补气补到 下限+60%×(上限-下限)=240Pa；排气排到 下限+50%×(上限-下限)=225Pa；
+    // 两者错开形成 225~240Pa 静止死区，压力落此区间时两阀均不动作，避免继电器频繁切换
+    int span = sysParams[2] - sysParams[0];
+    int underExit = sysParams[0] + span * UNDER_EXIT_PCT / 100;   // 240Pa
+    int overExit  = sysParams[0] + span * OVER_EXIT_PCT / 100;    // 225Pa
+    // =======================================================
 
     // --- 欠压 10 秒断电保护（始终运行，倒计时期间也需安全保护） ---
     if (p < sysParams[1]) {
@@ -512,7 +530,7 @@ void updatePressureControl() {
         } else if (!recoveryTimeoutAlarm) {
             if (recoveryTimeoutTimer == 0) {
                 recoveryTimeoutTimer = millis();
-            } else if (millis() - recoveryTimeoutTimer >= (uint32_t)sysParams[5] * 1000) {
+            } else if (millis() - recoveryTimeoutTimer >= RECOVERY_TIMEOUT_MS) {
                 recoveryTimeoutAlarm = true;
             }
         }
@@ -536,22 +554,22 @@ void updatePressureControl() {
         isFilling = false;
     }
 
-    // 2. 处理泄压状态（排到 50% 中点即停止）
+    // 2. 处理泄压状态（排到 50% 目标 225Pa 即停止）
     if (isExhausting) {
         digitalWrite(INLET_RELAY, LOW);
         digitalWrite(EXHAUST_RELAY, HIGH);
 
-        if (p <= targetPressure) {
+        if (p <= overExit) {
             isExhausting = false;
             digitalWrite(EXHAUST_RELAY, LOW);
         }
     }
-    // 3. 处理补气状态（补到 50% 中点即停止）
+    // 3. 处理补气状态（补到 60% 目标 240Pa 即停止）
     else if (isFilling) {
         digitalWrite(INLET_RELAY, HIGH);
         digitalWrite(EXHAUST_RELAY, LOW);
 
-        if (p >= targetPressure) {
+        if (p >= underExit) {
             digitalWrite(INLET_RELAY, LOW);
             isFilling = false;
         }
@@ -1552,6 +1570,7 @@ void processKeys() {
       globalAlarm = false;
       muteOn = false;
       initialCheckDone = false;
+      resetCountdownVentilationState();
       digitalWrite(POWER_RELAY, LOW);
       digitalWrite(INLET_RELAY, LOW);
       digitalWrite(EXHAUST_RELAY, LOW);
@@ -1593,6 +1612,7 @@ void processKeys() {
             globalAlarm = false;
             muteOn = false;
             digitalWrite(ALARM_RELAY, LOW);
+            resetCountdownVentilationState();
             applyCountdownVentilation((int)pressVal);
              
             // ====== 每次点击“正压启动”，把锁定状态清零 ======
@@ -1714,6 +1734,7 @@ void processKeys() {
         muteOn = false;
         systemRunningNormal = false;
         initialCheckDone = false;
+        resetCountdownVentilationState();
         digitalWrite(POWER_RELAY, LOW);
         digitalWrite(INLET_RELAY, LOW);
         digitalWrite(EXHAUST_RELAY, LOW);
@@ -2022,6 +2043,7 @@ void loop() {
       countdownRemain = sysParams[5];
       modeTimer = millis();
       sampleTimer = millis();
+      resetCountdownVentilationState();
       applyCountdownVentilation((int)pressVal);
       countdownDoneFirstRun = false;
       // 再次确保每次重新进入时，锁定状态清零
