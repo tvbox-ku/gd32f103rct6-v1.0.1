@@ -184,10 +184,7 @@ static inline uint16_t adcReadAvg(uint8_t ch) {
 
 // ====== 蜂鸣器 ======
 void beep(uint8_t n, uint16_t onMs = 100, uint16_t offMs = 100) {
-  for (uint8_t i = 0; i < n; i++) {
-    digitalWrite(BEEP_PIN, HIGH); delay(onMs);
-    digitalWrite(BEEP_PIN, LOW); if (i < n - 1) delay(offMs);
-  }
+  (void)n; (void)onMs; (void)offMs; // 蜂鸣器已屏蔽
 }
 
 // ====== 中文字库绘制 ======
@@ -697,6 +694,7 @@ drawMixedString(statusText, centerX, 154, textColor, 1.0f);
     drawMixedString("压力正常值:", 20, 190, TFT_BLACK, 1.0f);
     snprintf(buf, sizeof(buf), "%04d ~ %04dPa", sysParams[0], sysParams[2]); // 注意加了空格
     drawMixedString(buf, 200, 190, TFT_BLACK, 1.0f);
+    // 欠压断电倒计时显示（已屏蔽）
   } else {
     drawMixedString("换气开启压力:", 20, 190, TFT_BLACK, 1.0f);
     snprintf(buf, sizeof(buf), "%04d", sysParams[0]);
@@ -737,6 +735,9 @@ void updatePressureScreen() {
   static bool lastShowDisplay = false;
   static int32_t lastUpdatePressState = 0;  // 本函数独立的压力状态缓存，防止与 drawMainPage 的全局状态混淆
   static bool lastPressStateWasNormal = true;  // 上一次压力状态是否为正常，用于检测状态转换
+  static int32_t lastUnderPressureSec = -1;   // 欠压断电倒计时缓存
+  static bool lastPowerTripped = false;        // 已断电状态缓存
+  static bool lastUnderPressureBlink = false;  // 欠压断电闪烁缓存
 
   int p = (int)pressVal;
   uint16_t statusColor = TFT_GREEN;
@@ -863,6 +864,10 @@ void updatePressureScreen() {
     lastMuteOn_UI = !muteOn;
     lastGlobalAlarm_UI = !globalAlarm;
     lastPowerBar = !powerOnDelivered;
+    // 重置欠压断电显示缓存
+    lastUnderPressureSec = -1;
+    lastPowerTripped = !powerTripLatched;
+    lastUnderPressureBlink = false;
     // ================================================================
   }
 
@@ -965,6 +970,8 @@ void updatePressureScreen() {
     lastInletBar = digitalRead(INLET_RELAY);
     lastExhaustBar = digitalRead(EXHAUST_RELAY);
   }
+
+  // ---------- 欠压断电倒计时显示（已屏蔽） ----------
 
   // ---------- 底部按钮 ----------
   if (lastMuteOn_Button != muteOn || lastGlobalAlarm_Button != globalAlarm) {
