@@ -586,7 +586,7 @@ void drawTopStatusBar() {
   if (exhaustOn) { tft.fillRect(x, 2, sw, sh, COLOR_SPACEGREY); drawMixedString("排气", x+10, 5, TFT_WHITE, 1.0f); }
   x += sw+gap;
   tft.fillRect(x, 2, sw, sh, TFT_WHITE);
-  if (powerOn) { tft.fillRect(x, 2, sw, sh, TFT_GREEN); drawMixedString("送电", x+10, 5, TFT_WHITE, 1.0f); }
+  if (powerOn) { tft.fillRect(x, 2, sw, sh, TFT_DARKGREEN); drawMixedString("送电", x+10, 5, TFT_WHITE, 1.0f); }
   x += sw+gap;
   drawAlarmStatus(x, 2, sw, sh);
 }
@@ -636,7 +636,7 @@ void drawPressureScreen() {
 
   // --- 状态框文字与颜色逻辑（带滞后防抖） ---
   int p = (int)pressVal;
-  uint16_t statusColor = TFT_GREEN;
+  uint16_t statusColor = TFT_DARKGREEN;
   const char* statusText = "";
   bool alarmNow = false;
   int32_t pressState = 0;  // 0=正常, -1=低, 1=高
@@ -668,10 +668,10 @@ void drawPressureScreen() {
   } else {
     if (showDisplay && powerOnDelivered) {
       statusText = "系统运行中";
-      statusColor = TFT_GREEN;
+      statusColor = TFT_DARKGREEN;
     } else {
       statusText = "柜内压力正常";
-      statusColor = TFT_GREEN;
+      statusColor = TFT_DARKGREEN;
     }
   }
 
@@ -740,7 +740,7 @@ void updatePressureScreen() {
   static bool lastUnderPressureBlink = false;  // 欠压断电闪烁缓存
 
   int p = (int)pressVal;
-  uint16_t statusColor = TFT_GREEN;
+  uint16_t statusColor = TFT_DARKGREEN;
   const char* statusText = "";
   bool alarmNow = false;
   uint8_t currentState = 0;
@@ -792,11 +792,11 @@ void updatePressureScreen() {
     bool showDisplay = systemRunningNormal;
     if (showDisplay && powerOnDelivered) {
       statusText = "系统运行中";
-      statusColor = TFT_GREEN;
+      statusColor = TFT_DARKGREEN;
       currentState = 3;
     } else {
       statusText = "柜内压力正常";
-      statusColor = TFT_GREEN;
+      statusColor = TFT_DARKGREEN;
       currentState = 0;
     }
   }
@@ -921,8 +921,8 @@ void updatePressureScreen() {
                 textColor = TFT_WHITE;
             }
         } else {
-            // 正常状态：绿色稳定显示
-            backColor = TFT_GREEN;
+            // 正常状态：深绿色稳定显示
+            backColor = TFT_DARKGREEN;
             textColor = TFT_WHITE;
         }
 
