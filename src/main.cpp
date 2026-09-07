@@ -1581,6 +1581,17 @@ void updateParamScreen() {
 }
 
 // ====== 显示模式调度 ======
+void drawConfirmExitScreen() {
+  tft.fillScreen(TFT_BLACK);
+  tft.drawRect(40, 80, 400, 120, TFT_RED);
+  tft.fillRect(40, 80, 400, 120, TFT_DARKGREY);
+  drawMixedString("返回主页", 120, 100, TFT_YELLOW, 1.2f);
+  drawMixedString("将停止正压运行", 100, 140, TFT_WHITE, 1.0f);
+  drawMixedString("并关闭所有继电器", 110, 165, TFT_WHITE, 1.0f);
+  drawBtn(0, "取消", TFT_DARKGREY);
+  drawBtn(2, "确认", TFT_RED);
+}
+
 void drawScreen() {
   if (mode == 0) drawMainPage();
   else if (mode == 1) drawPressureScreen();
@@ -1591,6 +1602,7 @@ void drawScreen() {
   else if (mode == 6) drawParamScreen();
   else if (mode == 7) drawDebugConfirmScreen();
   else if (mode == 8) drawPasswordVerifyScreen();
+  else if (mode == 9) drawConfirmExitScreen();
 }
 
 
@@ -1897,6 +1909,9 @@ void processKeys() {
         int newDigit = (digit + 1) % 10;
         inputPwd = inputPwd - digit * div + newDigit * div;
         animateDigitScroll(150 + pwdDpos * 14, 100, '0' + digit, '0' + newDigit, TFT_YELLOW, TFT_BLACK);
+      } else if (mode == 9) {
+        mode = 1;
+        drawScreen();
       }
     }
   }
@@ -1925,6 +1940,9 @@ void processKeys() {
       } else if (mode == 8) {
         pwdDpos = (pwdDpos + 1) % 3;
         updatePasswordScreen();
+      } else if (mode == 9) {
+        mode = 1;
+        drawScreen();
       }
     }
   }
@@ -1943,28 +1961,7 @@ void processKeys() {
         drawScreen();
       }
       else if (mode == 1) {
-        // 返回主页：停止正压运行，清空全部状态，关全部继电器（不保留后台运行）
-        systemActive = false;
-        inPositiveMode = false;
-        countdownRemain = 0;
-        countdownDoneFirstRun = false;
-        powerTripLatched = false;
-        powerOnDelivered = false;
-        underPressureTimer = 0;
-        recoveryTimeoutTimer = 0;
-        recoveryTimeoutAlarm = false;
-        globalAlarm = false;
-        muteOn = false;
-        systemRunningNormal = false;
-        initialCheckDone = false;
-        resetCountdownVentilationState();
-      runElapsedSec = 0;
-      runTimer = 0;
-        digitalWrite(POWER_RELAY, LOW);
-        digitalWrite(INLET_RELAY, LOW);
-        digitalWrite(EXHAUST_RELAY, LOW);
-        digitalWrite(ALARM_RELAY, LOW);
-        mode = 0;
+        mode = 9;
         drawScreen();
       }
       else if (mode == 2) {
@@ -2027,6 +2024,29 @@ void processKeys() {
                 drawPasswordVerifyScreen();     
             }
         }
+      } else if (mode == 9) {
+        systemActive = false;
+        inPositiveMode = false;
+        countdownRemain = 0;
+        countdownDoneFirstRun = false;
+        powerTripLatched = false;
+        powerOnDelivered = false;
+        underPressureTimer = 0;
+        recoveryTimeoutTimer = 0;
+        recoveryTimeoutAlarm = false;
+        globalAlarm = false;
+        muteOn = false;
+        systemRunningNormal = false;
+        initialCheckDone = false;
+        resetCountdownVentilationState();
+        runElapsedSec = 0;
+        runTimer = 0;
+        digitalWrite(POWER_RELAY, LOW);
+        digitalWrite(INLET_RELAY, LOW);
+        digitalWrite(EXHAUST_RELAY, LOW);
+        digitalWrite(ALARM_RELAY, LOW);
+        mode = 0;
+        drawScreen();
       }
     }
   }
@@ -2325,7 +2345,7 @@ void loop() {
     screenSleeping = true;
   }
 
-  if (mode != 0 && mode != 1 && mode != 3 && mode != 7 && millis() - idleTimer >= IDLE_TIMEOUT_MS) {
+  if (mode != 0 && mode != 1 && mode != 3 && mode != 7 && mode != 9 && millis() - idleTimer >= IDLE_TIMEOUT_MS) {
     idleTimer = millis();
     mode = 0;
     drawScreen();
