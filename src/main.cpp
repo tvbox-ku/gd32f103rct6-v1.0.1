@@ -1582,7 +1582,7 @@ void updateParamScreen() {
 
 // ====== 显示模式调度 ======
 void drawConfirmExitScreen() {
-  tft.fillScreen(TFT_BLACK);
+  tft.fillScreen(TFT_WHITE);
   tft.drawRect(40, 80, 400, 120, TFT_RED);
   drawMixedString("返回主页", 182, 100, TFT_YELLOW, 1.2f);
   drawMixedString("将停止正压运行", 156, 140, TFT_RED, 1.0f);
@@ -2302,7 +2302,10 @@ void loop() {
       recoveryTimeoutAlarm = false;
       drawScreen();
     }
+  }
 
+  // 正压倒计时与运行时间逻辑（mode==1 和 mode==9 都需运行，确保确认退出界面期间正压不暂停）
+  if (mode == 1 || mode == 9) {
     if ((int)pressVal >= sysParams[1]) {
         if (countdownRemain > 0 && millis() - modeTimer >= 1000) {
             modeTimer = millis();
@@ -2322,7 +2325,7 @@ void loop() {
             powerOnDelivered = true;
             digitalWrite(POWER_RELAY, HIGH);
         }
-        drawTopStatusBar();
+        if (mode == 1) drawTopStatusBar();
     }
 
     // 运行时间计时（倒计时结束后每秒递增）
@@ -2330,7 +2333,9 @@ void loop() {
         runTimer += 1000;
         runElapsedSec++;
     }
+  }
 
+  if (mode == 1) {
     updatePressureScreen();
   }
 
