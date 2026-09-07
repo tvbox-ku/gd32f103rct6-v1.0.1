@@ -389,7 +389,7 @@
   <table>
     <tbody><tr><th>菜单项</th><th>功能</th></tr>
     <tr><td>修改密码</td><td>修改进入系统设置/调试的密码</td></tr>
-    <tr><td>校准传感器</td><td>对温度、压力、ADC1、ADC2 进行校准</td></tr>
+    <tr><td>校准传感器</td><td>对温度、压力及其他传感器进行校准</td></tr>
     <tr><td>设置参数</td><td>修改压力阈值、温度上限、换气时间</td></tr>
     <tr><td>恢复出厂</td><td>恢复全部默认参数与默认密码</td></tr>
   </tbody></table>
@@ -464,12 +464,12 @@
   </ol>
 
   <h3>5.5 校准传感器</h3>
-  <p>在「校准传感器」中可分别校准温度、压力、ADC1、ADC2：</p>
+  <p>在「校准传感器」中可分别校准温度、压力及其他2路传感器信号：</p>
   <ol>
     <li>按 <strong>KEY1</strong> 加减数值、<strong>KEY2</strong> 移位（温度支持正负号切换）、<strong>KEY3</strong> 切换校准项；</li>
     <li>长按 <strong>KEY3</strong> 保存校准结果，长按 <strong>KEY2</strong> 放弃修改。</li>
   </ol>
-  <div class="callout">温度传感器为 PT100 正温度系数，温度公式：T = ADC × 0.05893，量程 0~241℃。恢复出厂后校准页面显示 0（未校准），温度由绝对公式直接算出。</div>
+  <div class="callout">温度传感器为 PT100 铂电阻，量程 0~241℃。恢复出厂后校准页面显示 0（未校准），温度由系统自动计算。</div>
 
   <h3>5.6 设置参数</h3>
   <p>可设置以下 6 项参数：</p>
