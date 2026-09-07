@@ -1584,10 +1584,9 @@ void updateParamScreen() {
 void drawConfirmExitScreen() {
   tft.fillScreen(TFT_BLACK);
   tft.drawRect(40, 80, 400, 120, TFT_RED);
-  tft.fillRect(40, 80, 400, 120, TFT_DARKGREY);
   drawMixedString("返回主页", 182, 100, TFT_YELLOW, 1.2f);
-  drawMixedString("将停止正压运行", 156, 140, TFT_WHITE, 1.0f);
-  drawMixedString("并关闭所有继电器", 144, 165, TFT_WHITE, 1.0f);
+  drawMixedString("将停止正压运行", 156, 140, TFT_RED, 1.0f);
+  drawMixedString("并关闭所有继电器", 144, 165, TFT_RED, 1.0f);
   drawBtn(0, "取消", TFT_DARKGREY);
   drawBtn(2, "确认", TFT_RED);
 }
