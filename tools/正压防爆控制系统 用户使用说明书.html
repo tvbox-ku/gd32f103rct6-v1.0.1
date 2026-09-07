@@ -208,11 +208,10 @@
     <tbody><tr><th>项目</th><th>参数</th></tr>
     <tr><td>主控芯片</td><td>GD32F103RCT6（ARM Cortex-M3，72MHz）</td></tr>
     <tr><td>显示屏</td><td>3.5 寸 TFT 彩色屏，480×320 横屏，16 位并行接口</td></tr>
-    <tr><td>电源输入</td><td>直流供电（按柜体配电规格）</td></tr>
-    <tr><td>压力传感器</td><td>压力变送器（柜内正压，ADC 通道 PC4）</td></tr>
-    <tr><td>温度传感器</td><td>PT100 铂电阻（ADC 通道 PC5）</td></tr>
-    <tr><td>辅助 ADC</td><td>ADC1（PC2）、ADC2（PC3）备用通道</td></tr>
-    <tr><td>继电器输出</td><td>进气（PC0）、排气（PD2）、送电（PC1）、警报（PC12）共 4 路</td></tr>
+    <tr><td>电源输入</td><td>N、L 接输入 220V AC</td></tr>
+    <tr><td>压力传感器</td><td>压力变送器（柜内正压）</td></tr>
+    <tr><td>温度传感器</td><td>PT100 铂电阻</td></tr>
+    <tr><td>继电器输出</td><td>进气（接充气泵）、排气（接排气电磁阀）、送电（接输出 220V AC，负载≤3A）、警报（接警报灯）共 4 路</td></tr>
     <tr><td>按键</td><td>3 个（KEY1=PC7、KEY2=PC8、KEY3=PC9，短按 / 长按 3 秒）</td></tr>
     <tr><td>报警方式</td><td>屏幕声光提示 + 警报继电器输出</td></tr>
     <tr><td>息屏时间</td><td>15 分钟无操作自动关背光</td></tr>
@@ -232,7 +231,7 @@
 
   <!-- 三 -->
   <h2>三、系统组成与接线</h2>
-  <p>系统由主控单元、传感器、继电器输出和显示屏按键四部分组成。传感器信号接入主控 ADC 接口，主控根据压力、温度控制各继电器动作。</p>
+  <p>系统由主控单元、传感器、继电器输出和显示屏按键四部分组成。传感器信号接入主控，主控根据压力、温度控制各继电器动作。</p>
   <div class="figure">
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 860 430" font-family="Microsoft YaHei, sans-serif">
       <rect x="0" y="0" width="860" height="430" fill="#f5f6f8"></rect>
@@ -241,13 +240,10 @@
       <text x="125" y="80" text-anchor="middle" font-size="15" font-weight="bold" fill="#2b6cb0">输入 · 传感器</text>
       <rect x="40" y="95" width="170" height="46" rx="6" fill="#fff" stroke="#888"></rect>
       <text x="125" y="114" text-anchor="middle" font-size="13">温度传感器 PT100</text>
-      <text x="125" y="132" text-anchor="middle" font-size="12" fill="#666">PC5 (ADC15)</text>
+      <text x="125" y="132" text-anchor="middle" font-size="12" fill="#666">柜内温度检测</text>
       <rect x="40" y="150" width="170" height="46" rx="6" fill="#fff" stroke="#888"></rect>
       <text x="125" y="169" text-anchor="middle" font-size="13">压力变送器（柜压）</text>
-      <text x="125" y="187" text-anchor="middle" font-size="12" fill="#666">PC4 (ADC14)</text>
-      <rect x="40" y="205" width="170" height="46" rx="6" fill="#fff" stroke="#888"></rect>
-      <text x="125" y="224" text-anchor="middle" font-size="13">辅助 ADC1 / ADC2</text>
-      <text x="125" y="242" text-anchor="middle" font-size="12" fill="#666">PC2 / PC3（备用）</text>
+      <text x="125" y="187" text-anchor="middle" font-size="12" fill="#666">柜内压力检测</text>
       <rect x="310" y="55" width="240" height="230" rx="10" fill="#eafaf1" stroke="#2f855a" stroke-width="1.5"></rect>
       <text x="430" y="80" text-anchor="middle" font-size="15" font-weight="bold" fill="#2f855a">主控单元</text>
       <rect x="335" y="95" width="190" height="44" rx="6" fill="#2f855a"></rect>
@@ -259,13 +255,13 @@
       <rect x="630" y="55" width="210" height="230" rx="10" fill="#fdf2f2" stroke="#c0392b" stroke-width="1.5"></rect>
       <text x="735" y="80" text-anchor="middle" font-size="15" font-weight="bold" fill="#c0392b">输出 · 继电器</text>
       <rect x="650" y="95" width="170" height="40" rx="6" fill="#fff" stroke="#888"></rect>
-      <text x="735" y="120" text-anchor="middle" font-size="13">进气（PC0）</text>
+      <text x="735" y="120" text-anchor="middle" font-size="13">进气 → 充气泵</text>
       <rect x="650" y="142" width="170" height="40" rx="6" fill="#fff" stroke="#888"></rect>
-      <text x="735" y="167" text-anchor="middle" font-size="13">排气（PD2）</text>
+      <text x="735" y="167" text-anchor="middle" font-size="13">排气 → 排气电磁阀</text>
       <rect x="650" y="189" width="170" height="40" rx="6" fill="#fff" stroke="#888"></rect>
-      <text x="735" y="214" text-anchor="middle" font-size="13">送电（PC1）</text>
+      <text x="735" y="214" text-anchor="middle" font-size="13">送电 → 输出220V（≤3A）</text>
       <rect x="650" y="236" width="170" height="40" rx="6" fill="#fff" stroke="#888"></rect>
-      <text x="735" y="261" text-anchor="middle" font-size="13">警报（PC12）</text>
+      <text x="735" y="261" text-anchor="middle" font-size="13">警报 → 警报灯</text>
       <line x1="230" y1="165" x2="310" y2="165" stroke="#555" stroke-width="2" marker-end="url(#a)"></line>
       <line x1="550" y1="165" x2="630" y2="165" stroke="#555" stroke-width="2" marker-end="url(#a)"></line>
       <defs>
@@ -283,16 +279,13 @@
   </div>
   <table>
     <tbody><tr><th>接口</th><th>说明</th></tr>
-    <tr><td>PC5 (ADC15)</td><td>温度传感器 PT100</td></tr>
-    <tr><td>PC4 (ADC14)</td><td>压力变送器（柜内压力）</td></tr>
-    <tr><td>PC2 (ADC12)</td><td>辅助 ADC1（备用）</td></tr>
-    <tr><td>PC3 (ADC13)</td><td>辅助 ADC2（备用）</td></tr>
-    <tr><td>PC0</td><td>进气继电器</td></tr>
-    <tr><td>PD2</td><td>排气继电器</td></tr>
-    <tr><td>PC1</td><td>送电继电器</td></tr>
-    <tr><td>PC12</td><td>警报继电器</td></tr>
-    <tr><td>PC7/PC8/PC9</td><td>按键 KEY1/KEY2/KEY3</td></tr>
-    <tr><td>PC6</td><td>背光控制</td></tr>
+    <tr><td>N、L</td><td>输入 220V AC 电源</td></tr>
+    <tr><td>温度传感器接口</td><td>接 PT100 铂电阻（柜内温度检测）</td></tr>
+    <tr><td>压力传感器接口</td><td>接压力变送器（柜内压力检测）</td></tr>
+    <tr><td>进气输出</td><td>接充气泵</td></tr>
+    <tr><td>排气输出</td><td>接排气电磁阀</td></tr>
+    <tr><td>送电输出</td><td>接输出 220V AC（负载不得超过 3A）</C</td></tr>
+    <tr><td>警报输出</td><td>接警报灯</td></tr>
   </tbody></table>
   <div class="callout">接线前请确认断电，传感器与继电器接线遵循柜体电气图纸与防爆规范。</div>
 

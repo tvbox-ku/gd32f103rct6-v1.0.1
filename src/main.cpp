@@ -457,7 +457,7 @@ float calcDisplayPress() {
   if (filteredPressRaw < 0.0f) {
     filteredPressRaw = currentRaw;
   } else {
-    const float alpha = 0.35f; 
+    const float alpha = 0.2f;
     filteredPressRaw = filteredPressRaw * (1.0f - alpha) + currentRaw * alpha;
   }
 
@@ -1078,7 +1078,7 @@ void updatePressureScreen() {
     }
   }
 
-  if (lastPressVal != pressVal) {
+  if (abs(pressVal - lastPressVal) >= 2) {
     snprintf(buf, sizeof(buf), "%04dPa", (int)pressVal);
     int textWidth = strlen(buf) * 12;
     tft.fillRect(198, 112, textWidth + 4, 28, TFT_WHITE);
@@ -2188,7 +2188,7 @@ void loop() {
 
   if (millis() - sampleTimer >= 100) {
     sampleTimer = millis();
-    pressVal = (int)calcDisplayPress();
+    pressVal = (int)(calcDisplayPress() + 0.5f);
     tempVal = calcDisplayTemp();
     calcAdc1();
     calcAdc2();
