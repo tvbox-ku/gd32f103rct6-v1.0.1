@@ -317,6 +317,50 @@ void drawAsciiString24(const char* str, int x, int y, uint16_t color) {
   }
 }
 
+void drawAsciiChar24Rows(char ch, int x, int y, uint16_t color, int rowStart, int rowEnd) {
+  int offsetY = 0;
+  if (ch == '-') offsetY = 4;
+  else if (ch == '~') offsetY = 8;
+  for (int i = 0; i < ASCII_24_COUNT; i++) {
+    if (font_ascii_24[i].ch == ch) {
+      for (int row = rowStart; row < rowEnd; row++) {
+        int runStart = -1;
+        for (int col = 0; col <= 16; col++) {
+          bool pixelOn = false;
+          if (col < 16) {
+            int byteIdx = row * 2 + col / 8;
+            pixelOn = (font_ascii_24[i].matrix[byteIdx] & (0x01 << (col % 8))) != 0;
+          }
+          if (pixelOn) {
+            if (runStart < 0) runStart = col;
+          } else {
+            if (runStart >= 0) {
+              tft.fillRect(x + runStart, y + offsetY + (row - rowStart), col - runStart, 1, color);
+              runStart = -1;
+            }
+          }
+        }
+      }
+      return;
+    }
+  }
+}
+
+void animateDigitScroll(int x, int y, char oldCh, char newCh, uint16_t color, uint16_t bgColor) {
+  const int charH = 24;
+  const int frames = 4;
+  const int frameMs = 25;
+  for (int f = 1; f <= frames; f++) {
+    int off = (charH * f) / frames;
+    tft.fillRect(x - 1, y, 17, charH, bgColor);
+    if (off < charH) drawAsciiChar24Rows(oldCh, x, y, color, off, charH);
+    if (off > 0) drawAsciiChar24Rows(newCh, x, y + (charH - off), color, 0, off);
+    delay(frameMs);
+  }
+  tft.fillRect(x - 1, y, 17, charH, bgColor);
+  drawAsciiChar24(newCh, x, y, color, 1.0f);
+}
+
 // ====== 20x20 中文字体绘制（用于顶栏运行时间显示） ======
 void drawChineseChar20(const char* ch, int x, int y, uint16_t color) {
   for (int i = 0; i < FONT_20_COUNT; i++) {
@@ -1797,42 +1841,48 @@ void processKeys() {
         int digit = (inputPwd / div) % 10;
         int newDigit = (digit + 1) % 10;
         inputPwd = inputPwd - digit * div + newDigit * div;
-        updatePasswordScreen();
+        animateDigitScroll(150 + pwdDpos * 14, 100, '0' + digit, '0' + newDigit, TFT_YELLOW, TFT_BLACK);
       } else if (mode == 5) {
         if (calibSel == 1 && calibDpos == 0) {
-          // 温度符号位：按"值加"切换 +/-
+          char oldSign = calibTempNeg ? '-' : '+';
           calibTempNeg = !calibTempNeg;
+          char newSign = calibTempNeg ? '-' : '+';
+          animateDigitScroll(200, 80, oldSign, newSign, TFT_YELLOW, TFT_BLACK);
         } else {
           int div;
           int32_t* editVal;
+          int digitX, digitY;
           if (calibSel == 1) {
-            // 温度数字位：1=百位 2=十位 3=个位
             div = (calibDpos == 1) ? 100 : (calibDpos == 2) ? 10 : 1;
             editVal = &calibEditTemp;
+            digitX = 200 + calibDpos * 14;
+            digitY = 80;
           } else {
             div = (calibDpos == 0) ? 1000 : (calibDpos == 1) ? 100 : (calibDpos == 2) ? 10 : 1;
             editVal = &calibEditPress;
+            digitX = 200 + calibDpos * 14;
+            digitY = 140;
           }
           int absVal = (*editVal < 0) ? -*editVal : *editVal;
           int digit = (absVal / div) % 10;
           int newDigit = (digit + 1) % 10;
           absVal = absVal - digit * div + newDigit * div;
           *editVal = (calibSel == 1 && calibTempNeg) ? -absVal : absVal;
+          animateDigitScroll(digitX, digitY, '0' + digit, '0' + newDigit, TFT_YELLOW, TFT_BLACK);
         }
-        updateCalibScreen();
       } else if (mode == 6) {
         int div = (paramDpos == 0) ? 1000 : (paramDpos == 1) ? 100 : (paramDpos == 2) ? 10 : 1;
         int digit = (paramEditVal[paramSel] / div) % 10;
         int newDigit = (digit + 1) % 10;
         paramEditVal[paramSel] = paramEditVal[paramSel] - digit * div + newDigit * div;
-        updateParamScreen();
+        animateDigitScroll(200 + paramDpos * 14, 32 + paramSel * 34, '0' + digit, '0' + newDigit, TFT_YELLOW, COLOR_SPACEGREY);
       } else if (mode == 7) {
       } else if (mode == 8) {
         int div = (pwdDpos == 0) ? 100 : (pwdDpos == 1) ? 10 : 1;
         int digit = (inputPwd / div) % 10;
         int newDigit = (digit + 1) % 10;
         inputPwd = inputPwd - digit * div + newDigit * div;
-        updatePasswordScreen();
+        animateDigitScroll(150 + pwdDpos * 14, 100, '0' + digit, '0' + newDigit, TFT_YELLOW, TFT_BLACK);
       }
     }
   }
