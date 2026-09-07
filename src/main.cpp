@@ -531,7 +531,8 @@ float calcAdc2() {
 static bool hasSafetyAlert() {
   bool pressureAlert = systemActive && countdownRemain == 0 &&
                        ((int)pressVal < sysParams[1] || (int)pressVal > sysParams[3]);
-  return tempSensorAbnormal || pressSensorAbnormal || pressureAlert;
+  bool tempAlert = systemActive && countdownRemain == 0 && ((int)tempVal > sysParams[4]);
+  return tempSensorAbnormal || pressSensorAbnormal || pressureAlert || tempAlert;
 }
 
 // ====== 菜单按钮绘制 ======
@@ -558,7 +559,7 @@ void updateGlobalAlarmState() {
     bool canAlarm = (countdownRemain == 0);
     if (!canAlarm) return;
     int p = (int)pressVal;
-    bool alarmNow = (p < sysParams[1] || p > sysParams[3]);
+    bool alarmNow = (p < sysParams[1] || p > sysParams[3]) || ((int)tempVal > sysParams[4]);
     if (alarmNow) {
         globalAlarm = true;
         if (!muteOn) digitalWrite(ALARM_RELAY, HIGH);
@@ -811,8 +812,15 @@ void drawPressureScreen() {
   // --- 第一行：倒计时或温度 ---
   if (showDisplay) {
     drawMixedString("柜内温度:", 20, 70, TFT_BLACK);
-    snprintf(buf, sizeof(buf), "%02d℃", (int)tempVal);
-    drawMixedString(buf, 200, 72, TFT_BLACK);
+    bool tempOverLimit = ((int)tempVal > sysParams[4]);
+    if (tempOverLimit) {
+      tft.fillRect(200, 70, 80, 28, TFT_RED);
+      snprintf(buf, sizeof(buf), "%02d℃", (int)tempVal);
+      drawMixedString(buf, 200, 72, TFT_WHITE);
+    } else {
+      snprintf(buf, sizeof(buf), "%02d℃", (int)tempVal);
+      drawMixedString(buf, 200, 72, TFT_BLACK);
+    }
   } else {
     drawMixedString("换气倒计时:", 20, 70, TFT_BLACK);
     snprintf(buf, sizeof(buf), "%04ds", countdownRemain);
@@ -909,6 +917,7 @@ drawMixedString(statusText, centerX, 154, textColor, 1.0f);
 void updatePressureScreen() {
   char buf[32];
   static int32_t lastTempVal = -999;
+  static bool lastTempBlinkOn = false;
   static int32_t lastCountdown = -1;
   static int32_t lastPressVal = -1;
   static uint8_t lastPressureState = 255;
@@ -1063,11 +1072,16 @@ void updatePressureScreen() {
 
   // ---------- 动态数值刷新 ----------
   if (showDisplay) {
-    if (lastTempVal != (int)tempVal) {
-      tft.fillRect(200, 70, 80, 28, TFT_WHITE);
+    bool tempOverLimit = ((int)tempVal > sysParams[4]);
+    bool tempBlinkOn = tempOverLimit && blinkOn;
+    if (lastTempVal != (int)tempVal || lastTempBlinkOn != tempBlinkOn) {
+      uint16_t tempBg = tempBlinkOn ? TFT_RED : TFT_WHITE;
+      uint16_t tempFg = tempBlinkOn ? TFT_WHITE : TFT_BLACK;
+      tft.fillRect(200, 70, 80, 28, tempBg);
       snprintf(buf, sizeof(buf), "%02d℃", (int)tempVal);
-      drawMixedString(buf, 200, 72, TFT_BLACK);
+      drawMixedString(buf, 200, 72, tempFg);
       lastTempVal = (int)tempVal;
+      lastTempBlinkOn = tempBlinkOn;
     }
   } else {
     if (lastCountdown != countdownRemain) {
