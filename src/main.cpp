@@ -1316,14 +1316,11 @@ void drawDebugConfirmScreen() {
   drawAsciiString24(buf, 310, 160, TFT_WHITE);
   drawMixedString("℃", 350, 160, TFT_WHITE, 1.0f);
 
-  // 底部两个按钮并排：左红"调试结束"(KEY1)，右绿"返回主页"(KEY3)
-  int btnW = 180, btnH = 40, btnY = 230, gap = 20;
-  int btn0X = (W - btnW * 2 - gap) / 2;
-  int btn1X = btn0X + btnW + gap;
-  tft.fillRect(btn0X, btnY, btnW, btnH, TFT_RED);
-  drawMixedString("调试结束", btn0X + (btnW - 4 * 26) / 2, btnY + 8, TFT_WHITE, 1.0f);
-  tft.fillRect(btn1X, btnY, btnW, btnH, TFT_DARKGREEN);
-  drawMixedString("返回主页", btn1X + (btnW - 4 * 26) / 2, btnY + 8, TFT_WHITE, 1.0f);
+  // 底部单个按钮居中：红色"返回主页"(KEY1/KEY3)
+  int btnW = 180, btnH = 40, btnY = 230;
+  int btnX = (W - btnW) / 2;
+  tft.fillRect(btnX, btnY, btnW, btnH, TFT_RED);
+  drawMixedString("返回主页", btnX + (btnW - 4 * 26) / 2, btnY + 8, TFT_WHITE, 1.0f);
 }
 
 // ====== 调试确认页 局部刷新 ======
@@ -1943,7 +1940,7 @@ void processKeys() {
         paramEditVal[paramSel] = paramEditVal[paramSel] - digit * div + newDigit * div;
         animateDigitScroll(200 + paramDpos * 14, 32 + paramSel * 34, '0' + digit, '0' + newDigit, TFT_YELLOW, COLOR_SPACEGREY);
       } else if (mode == 7) {
-        mode = 3; drawScreen();
+        mode = 0; drawScreen();
       } else if (mode == 8) {
         int div = (pwdDpos == 0) ? 100 : (pwdDpos == 1) ? 10 : 1;
         int digit = (inputPwd / div) % 10;
