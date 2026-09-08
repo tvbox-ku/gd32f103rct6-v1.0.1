@@ -1584,11 +1584,12 @@ void updateParamScreen() {
 void drawConfirmExitScreen() {
   tft.fillScreen(TFT_BLACK);
 
-  // 警告图标：红色三角形 + 白色感叹号
+  // 警告图标：黄色三角形 + 黑色边框 + 黑色感叹号
   int cx = 240, cy = 70, sz = 22;
-  tft.fillTriangle(cx, cy - sz, cx - sz, cy + sz, cx + sz, cy + sz, TFT_RED);
-  tft.fillRect(cx - 2, cy - 8, 4, 14, TFT_WHITE);
-  tft.fillRect(cx - 2, cy + 10, 4, 4, TFT_WHITE);
+  tft.fillTriangle(cx, cy - sz, cx - sz, cy + sz, cx + sz, cy + sz, TFT_YELLOW);
+  tft.drawTriangle(cx, cy - sz, cx - sz, cy + sz, cx + sz, cy + sz, TFT_BLACK);
+  tft.fillRect(cx - 2, cy - 8, 4, 14, TFT_BLACK);
+  tft.fillRect(cx - 2, cy + 10, 4, 4, TFT_BLACK);
 
   // 警告文字（白色，分两行居中）
   drawMixedString("警告：返回主页将停止正压运行", 78, 115, TFT_WHITE, 1.0f);
