@@ -1582,10 +1582,10 @@ void updateParamScreen() {
 
 // ====== 显示模式调度 ======
 void drawConfirmExitScreen() {
-  tft.fillScreen(TFT_BLACK);
-  drawMixedString("返回主页", 182, 100, TFT_BLACK, 1.2f);
-  drawMixedString("将停止正压运行", 156, 140, TFT_BLACK, 1.0f);
-  drawMixedString("并关闭所有继电器", 144, 165, TFT_BLACK, 1.0f);
+  tft.fillScreen(TFT_WHITE);
+  drawMixedString("返 回 主 页", 156, 90, TFT_BLACK, 1.2f);
+  drawMixedString("将 停 止 正 压 运 行", 113, 130, TFT_BLACK, 1.0f);
+  drawMixedString("并 关 闭 所 有 继 电 器", 94, 160, TFT_BLACK, 1.0f);
   drawBtn(0, "取消", TFT_DARKGREY);
   drawBtn(2, "确认", TFT_RED);
 }
