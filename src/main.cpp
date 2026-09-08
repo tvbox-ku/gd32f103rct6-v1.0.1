@@ -1281,14 +1281,14 @@ void drawDebugScreen() {
   drawMixedString("警告!危险区域严禁在现场使用;", 59, 105, TFT_WHITE, 1.0f);
   drawMixedString("可能导致爆炸,请确认安全。", 78, 135, TFT_WHITE, 1.0f);
 
-  // 底部两个按钮并排：左绿"返回主页"(KEY1)，右红"确认调试"(KEY3)
+  // 底部两个按钮并排：左红"确认调试"(KEY1)，右绿"返回主页"(KEY3)
   int btnW = 180, btnH = 40, btnY = 230, gap = 20;
   int btn0X = (W - btnW * 2 - gap) / 2;
   int btn1X = btn0X + btnW + gap;
-  tft.fillRect(btn0X, btnY, btnW, btnH, TFT_DARKGREEN);
-  drawMixedString("返回主页", btn0X + (btnW - 4 * 26) / 2, btnY + 8, TFT_WHITE, 1.0f);
-  tft.fillRect(btn1X, btnY, btnW, btnH, TFT_RED);
-  drawMixedString("确认调试", btn1X + (btnW - 4 * 26) / 2, btnY + 8, TFT_WHITE, 1.0f);
+  tft.fillRect(btn0X, btnY, btnW, btnH, TFT_RED);
+  drawMixedString("确认调试", btn0X + (btnW - 4 * 26) / 2, btnY + 8, TFT_WHITE, 1.0f);
+  tft.fillRect(btn1X, btnY, btnW, btnH, TFT_DARKGREEN);
+  drawMixedString("返回主页", btn1X + (btnW - 4 * 26) / 2, btnY + 8, TFT_WHITE, 1.0f);
 }
 
 // ====== 调试确认页 (mode=7) ====== 
@@ -1887,7 +1887,7 @@ void processKeys() {
       } else if (mode == 2) {
         mode = 0; drawScreen();
       } else if (mode == 3) {
-        mode = 0; drawScreen();
+        mode = 7; drawScreen();
       } else if (mode == 4) {
         int div = (pwdDpos == 0) ? 100 : (pwdDpos == 1) ? 10 : 1;
         int digit = (inputPwd / div) % 10;
@@ -2027,11 +2027,7 @@ void processKeys() {
         }
         drawScreen();
       } else if (mode == 3) {
-        mode = 7;
-        digitalWrite(POWER_RELAY, HIGH);
-        powerTripLatched = false;
-        underPressureTimer = 0;
-        drawScreen();
+        mode = 0; drawScreen();
       } else if (mode == 4) { inputPwd = 0; pwdDpos = 0; updatePasswordScreen(); }
       else if (mode == 5) {
         calibSel = (calibSel + 1) % 2;
