@@ -51,7 +51,6 @@ static bool universalPwdUsed = false;
 static uint16_t targetPassword = DEFAULT_PASSWORD;
 static uint8_t mode = 0;
 
-// 背光控制：PC6 高电平 → S8050 导通 → 背光亮
 static void setBacklight(bool on) {
   if (TFT_BL_PIN >= 0) {
     digitalWrite(TFT_BL_PIN, on ? HIGH : LOW);
@@ -191,12 +190,7 @@ static inline uint16_t adcReadAvg(uint8_t ch) {
 
 // ====== 蜂鸣器 ======
 void beep(uint8_t n, uint16_t onMs = 100, uint16_t offMs = 100) {
-  for (uint8_t i = 0; i < n; i++) {
-    digitalWrite(BEEP_PIN, HIGH);
-    if (onMs > 0) delay(onMs);
-    digitalWrite(BEEP_PIN, LOW);
-    if (offMs > 0 && i < n - 1) delay(offMs);
-  }
+  (void)n; (void)onMs; (void)offMs; // 蜂鸣器已屏蔽
 }
 
 // ====== 中文字库绘制 ======
@@ -1684,7 +1678,7 @@ void loadCalibration() {
         calibEditPress = 0;
         calibSaved = false;
     }
-    // Flash 数据异常（calibTempVal 接近 0，不可能是合法的 -40 零点）→ 恢复绝对模型
+
     if (calibTempVal < 1.0f && calibTempVal > -1.0f) {
         calibTempRaw = 0;
         calibTempVal = TEMP_RANGE_MIN;
@@ -1747,13 +1741,13 @@ void processKeys() {
   // 长按
   if (k1 == LOW && !k1LongFired && now - k1PressTime >= KEY_LONG_PRESS_MS) {
     k1LongFired = true;
-    if (mode == 8) { beep(3); mode = 0; drawScreen(); }
+    if (mode == 8) { beep(2); mode = 0; drawScreen(); }
   }
   if (k2 == LOW && !k2LongFired && now - k2PressTime >= KEY_LONG_PRESS_MS) {
     k2LongFired = true;
-    if (mode == 4) { beep(3); mode = 2; drawScreen(); }
+    if (mode == 4) { beep(2); mode = 2; drawScreen(); }
     if (mode == 5) {
-      beep(3);
+      beep(2);
       calibEditTemp = calibInitTemp;
       calibEditPress = calibInitPress;
       calibDpos = 0;
@@ -1765,7 +1759,7 @@ void processKeys() {
       drawScreen();
     }
     if (mode == 6) {
-      beep(3);
+      beep(2);
       for (int i = 0; i < 6; i++) paramEditVal[i] = sysParams[i];
       paramDpos = 0;
       tft.fillRect(80, 120, 320, 60, TFT_BLACK);
@@ -1779,9 +1773,9 @@ void processKeys() {
   // KEY3 长按：保存
   if (k3 == LOW && !k3LongFired && now - k3PressTime >= KEY_LONG_PRESS_MS) {
     k3LongFired = true;
-    if (mode == 4) { beep(3); targetPassword = inputPwd; saveSysParams(); tft.fillRect(60, 100, 360, 50, TFT_BLACK); tft.drawRect(60, 100, 360, 50, TFT_WHITE); drawMixedString("密码已修改", 160, 115, TFT_GREEN, 1.5f); delay(1500); mode = 2; drawScreen(); }
+    if (mode == 4) { beep(2); targetPassword = inputPwd; saveSysParams(); tft.fillRect(60, 100, 360, 50, TFT_BLACK); tft.drawRect(60, 100, 360, 50, TFT_WHITE); drawMixedString("密码已修改", 160, 115, TFT_GREEN, 1.5f); delay(1500); mode = 2; drawScreen(); }
     if (mode == 5) {
-      beep(3);
+      beep(2);
       int currentTempAdc = adcReadAvg(TEMP_ADC_CH);
       int currentPressAdc = adcReadAvg(PRESS_ADC_CH);
       float tempCoeff = TEMP_COEFF * 3.3f / 4095.0f * 1000.0f;
@@ -1797,7 +1791,7 @@ void processKeys() {
       drawScreen();
     }
     if (mode == 6) {
-      beep(3);
+      beep(2);
       for (int i = 0; i < 6; i++) sysParams[i] = paramEditVal[i];
       saveSysParams();
       tft.fillRect(80, 120, 320, 60, TFT_BLACK);
@@ -1808,7 +1802,7 @@ void processKeys() {
       drawScreen();
     }
     if (mode == 2 && settingsSel == 3) {
-      beep(3);
+      beep(2);
       for (int i = 0; i < 6; i++) sysParams[i] = DEFAULT_SYSPARAMS[i];
       targetPassword = DEFAULT_PASSWORD;
       filteredPressRaw = -1.0f;
@@ -1864,7 +1858,7 @@ void processKeys() {
     lastK1Time = now;
     idleTimer = millis(); 
     if (!k1LongFired) {
-      beep(1, 50, 0); 
+      beep(1, 30, 0); 
       if (mode == 0) {
         if (systemActive && globalAlarm && !muteOn) {
             muteOn = true;
@@ -1993,7 +1987,7 @@ void processKeys() {
     lastK2Time = now;
     idleTimer = millis();
     if (!k2LongFired) {
-      beep(1, 50, 0); 
+      beep(1, 30, 0); 
       if (mode == 0) {
         pwdTargetMode = 2;          
         mode = 8;                   
@@ -2024,7 +2018,7 @@ void processKeys() {
     lastK3Time = now;
     idleTimer = millis();
     if (!k3LongFired) {
-      beep(1, 50, 0); 
+      beep(1, 30, 0); 
       if (mode == 0) {
         pwdTargetMode = 3;          
         mode = 8;                   
