@@ -1282,13 +1282,13 @@ void drawDebugScreen() {
   drawMixedString("可能导致爆炸,请确认安全。", 78, 135, TFT_WHITE, 1.0f);
 
   // 底部两个按钮并排：左红"确认调试"(KEY1)，右绿"返回主页"(KEY3)
-  int btnW = 180, btnH = 40, btnY = 230, gap = 20;
+  int btnW = 150, btnH = 40, btnY = 230, gap = 20;
   int btn0X = (W - btnW * 2 - gap) / 2;
   int btn1X = btn0X + btnW + gap;
-  tft.fillRect(btn0X, btnY, btnW, btnH, TFT_RED);
-  drawMixedString("确认调试", btn0X + (btnW - 4 * 26) / 2, btnY + 8, TFT_WHITE, 1.0f);
-  tft.fillRect(btn1X, btnY, btnW, btnH, TFT_DARKGREEN);
-  drawMixedString("返回主页", btn1X + (btnW - 4 * 26) / 2, btnY + 8, TFT_WHITE, 1.0f);
+  tft.fillRect(btn0X-80, btnY+50, btnW, btnH, TFT_RED);
+  drawMixedString("确认调试", btn0X + (btnW - 4 * 26) / 2-75, btnY +60, TFT_WHITE, 1.0f);
+  tft.fillRect(btn1X+80, btnY+50, btnW, btnH, TFT_DARKGREEN);
+  drawMixedString("返回主页", btn1X + (btnW - 4 * 26) / 2+75, btnY +60, TFT_WHITE, 1.0f);
 }
 
 // ====== 调试确认页 (mode=7) ======
@@ -1317,10 +1317,10 @@ void drawDebugConfirmScreen() {
   drawMixedString("℃", 350, 160, TFT_WHITE, 1.0f);
 
   // 底部单个按钮居中：红色"返回主页"(KEY1/KEY3)
-  int btnW = 180, btnH = 40, btnY = 230;
+  int btnW = 150, btnH = 40, btnY = 230;
   int btnX = (W - btnW) / 2;
-  tft.fillRect(btnX, btnY, btnW, btnH, TFT_RED);
-  drawMixedString("返回主页", btnX + (btnW - 4 * 26) / 2, btnY + 8, TFT_WHITE, 1.0f);
+  tft.fillRect(btnX+150, btnY+45, btnW, btnH, TFT_RED);
+  drawMixedString("返回主页", btnX + (btnW - 4 * 26) / 2+150, btnY +53, TFT_WHITE, 1.0f);
 }
 
 // ====== 调试确认页 局部刷新 ======
@@ -1620,14 +1620,20 @@ void drawConfirmExitScreen() {
   drawMixedString("并关闭所有继电器", 136, 145, TFT_WHITE, 1.0f);
 
   // 底部两个按钮并排：左红"确认返回"(KEY3)，右绿"取消"(KEY1)
-  int btnW = 180, btnH = 40, btnY = 230, gap = 20;
+  int btnW = 150, btnH = 40, btnY = 230, gap = 20;
   int btn0X = (W - btnW * 2 - gap) / 2;
   int btn1X = btn0X + btnW + gap;
-  tft.fillRect(btn0X, btnY, btnW, btnH, TFT_RED);
-  drawMixedString("确认返回", btn0X + (btnW - 4 * 26) / 2, btnY + 8, TFT_WHITE, 1.0f);
-  tft.fillRect(btn1X, btnY, btnW, btnH, TFT_DARKGREEN);
-  drawMixedString("取消", btn1X + (btnW - 2 * 26) / 2, btnY + 8, TFT_WHITE, 1.0f);
+  tft.fillRect(btn0X-80, btnY+50, btnW, btnH, TFT_RED);
+  drawMixedString("确认返回", btn0X + (btnW - 4 * 26) / 2-75, btnY +58, TFT_WHITE, 1.0f);
+  tft.fillRect(btn1X+80, btnY+50, btnW, btnH, TFT_DARKGREEN);
+  drawMixedString("取消", btn1X + (btnW - 4 * 26) / 2+100, btnY +58, TFT_WHITE, 1.0f);
 }
+
+
+
+
+
+
 
 void drawScreen() {
   if (mode == 0) drawMainPage();
