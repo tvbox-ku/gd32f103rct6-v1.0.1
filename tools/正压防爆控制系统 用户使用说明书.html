@@ -396,11 +396,16 @@
 
   <h3>4.4 按键通用规则</h3>
   <table>
-    <tbody><tr><th>按键</th><th>短按</th><th>长按（3 秒）</th></tr>
-    <tr><td>KEY1</td><td>确认 / 值加 / 消音</td><td>密码验证页返回主页</td></tr>
-    <tr><td>KEY2</td><td>下一选项 / 下一位</td><td>放弃修改（密码页/校准页/参数页）</td></tr>
-    <tr><td>KEY3</td><td>进入 / 确认 / 下一项</td><td>保存 / 恢复出厂</td></tr>
+    <tbody><tr><th>按键</th><th>主页面</th><th>正压运行</th><th>设置/调试</th><th>密码/校准/参数</th></tr>
+    <tr><td>KEY1（左）</td><td>正压启动</td><td>消音 / 取消退出</td><td>返回上一级</td><td>值加 / 确认</td></tr>
+    <tr><td>KEY2（中）</td><td>系统设置</td><td>—</td><td>下一选项</td><td>移位 / 放弃修改</td></tr>
+    <tr><td>KEY3（右）</td><td>系统调试</td><td>弹出返回确认</td><td>进入选中项</td><td>确认 / 保存</td></tr>
   </tbody></table>
+  <p><strong>长按功能：</strong></p>
+  <ul>
+    <li>校准页/参数页：长按 KEY3 保存，长按 KEY2 放弃修改</li>
+    <li>密码验证页：长按 KEY1 返回主页</li>
+  </ul>
 
   <!-- 五 -->
   <h2>五、操作指南</h2>
@@ -482,12 +487,13 @@
   <p>操作：<strong>KEY1</strong> 加值、<strong>KEY2</strong> 移位、<strong>KEY3</strong> 切换下一项；长按 <strong>KEY3</strong> 保存，长按 <strong>KEY2</strong> 放弃。</p>
 
   <h3>5.7 系统调试</h3>
-  <div class="danger"><strong>危险！</strong>调试模式会在现场直接送电，请务必确认危险区域无人、环境安全后方可操作。确认页仅作安全提示，按返回主页将退出调试。</div>
+  <div class="danger"><strong>危险！</strong>调试模式会在现场直接送电，请务必确认危险区域无人、环境安全后方可操作。</div>
   <ol>
     <li>主页面按 <strong>KEY3</strong>，输入密码进入调试页；</li>
-    <li>阅读安全提示后，按 <strong>KEY1（确认调试）</strong>进入确认页；</li>
-    <li>屏幕显示"系统已送电!请确认安全。"及实时压力、温度，确认安全后按 <strong>KEY1 或 KEY3</strong> 返回主页。</li>
+    <li>阅读安全提示后，按 <strong>KEY1（确认调试）</strong>进入确认页，此时系统开启送电继电器；</li>
+    <li>确认页显示"系统已送电!请确认安全。"及实时压力、温度，确认安全后按 <strong>KEY1 或 KEY3</strong> 返回主页。</li>
   </ol>
+  <div class="callout">进入调试确认页时系统会开启送电继电器，返回主页时自动关闭。请务必确认现场安全后再操作。</div>
 
   <!-- 六 -->
   <h2>六、参数说明</h2>
