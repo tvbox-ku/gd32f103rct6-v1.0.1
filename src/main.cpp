@@ -1291,25 +1291,39 @@ void drawDebugScreen() {
   drawMixedString("返回主页", btn1X + (btnW - 4 * 26) / 2, btnY + 8, TFT_WHITE, 1.0f);
 }
 
-// ====== 调试确认页 (mode=7) ====== 
+// ====== 调试确认页 (mode=7) ======
 void drawDebugConfirmScreen() {
-  tft.fillScreen(TFT_WHITE);
-  tft.fillRect(W - 95, 3, 70, 30, TFT_WHITE);
-  tft.fillRect(W - 95, 3, 70, 30, TFT_RED);
-  drawMixedString("送电", W - 85, 5, TFT_WHITE, 1.0f);
-  drawTitleString("系统已送电 请确认安全", 60, 80, TFT_RED);
+  tft.fillScreen(TFT_BLACK);
+
+  // 警告图标：黄色三角形 + 粗黑边框 + 黑色感叹号
+  int cx = 240, cy = 55, sz = 22, bw = 3;
+  tft.fillTriangle(cx, cy - sz, cx - sz, cy + sz, cx + sz, cy + sz, TFT_BLACK);
+  tft.fillTriangle(cx, cy - sz + bw, cx - sz + bw, cy + sz - bw, cx + sz - bw, cy + sz - bw, TFT_YELLOW);
+  tft.fillRect(cx - 3, cy - 8, 6, 15, TFT_BLACK);
+  tft.fillRect(cx - 3, cy + 10, 6, 5, TFT_BLACK);
+
+  // 警告文字（白色，24x24字体，居中）
+  drawMixedString("系统已送电!请确认安全。", 110, 105, TFT_WHITE, 1.0f);
+
+  // 压力温度显示（保留）
   char buf[32];
   snprintf(buf, sizeof(buf), "%04d", (int)pressVal);
-  drawMixedString("压力:", 30, 200, TFT_BLACK, 1.0f);
-  drawAsciiString24(buf, 112, 200, TFT_BLACK);
-  drawMixedString("Pa", 170, 200, TFT_BLACK, 1.0f);
+  drawMixedString("压力:", 30, 160, TFT_WHITE, 1.0f);
+  drawAsciiString24(buf, 112, 160, TFT_WHITE);
+  drawMixedString("Pa", 170, 160, TFT_WHITE, 1.0f);
   snprintf(buf, sizeof(buf), "%02d", (int)tempVal);
-  drawMixedString("温度:", 230, 200, TFT_BLACK, 1.0f);
-  drawAsciiString24(buf, 310, 200, TFT_BLACK);
-  drawMixedString("℃", 350, 200, TFT_BLACK, 1.0f);
-  drawBtn(0, "", TFT_WHITE);
-  drawBtn(1, "", TFT_WHITE);
-  drawBtn(2, "调试结束", TFT_DARKGREY);
+  drawMixedString("温度:", 230, 160, TFT_WHITE, 1.0f);
+  drawAsciiString24(buf, 310, 160, TFT_WHITE);
+  drawMixedString("℃", 350, 160, TFT_WHITE, 1.0f);
+
+  // 底部两个按钮并排：左红"调试结束"(KEY1)，右绿"返回主页"(KEY3)
+  int btnW = 180, btnH = 40, btnY = 230, gap = 20;
+  int btn0X = (W - btnW * 2 - gap) / 2;
+  int btn1X = btn0X + btnW + gap;
+  tft.fillRect(btn0X, btnY, btnW, btnH, TFT_RED);
+  drawMixedString("调试结束", btn0X + (btnW - 4 * 26) / 2, btnY + 8, TFT_WHITE, 1.0f);
+  tft.fillRect(btn1X, btnY, btnW, btnH, TFT_DARKGREEN);
+  drawMixedString("返回主页", btn1X + (btnW - 4 * 26) / 2, btnY + 8, TFT_WHITE, 1.0f);
 }
 
 // ====== 调试确认页 局部刷新 ======
@@ -1317,12 +1331,12 @@ void updateDebugConfirmScreen() {
   char buf[32];
   snprintf(buf, sizeof(buf), "%04d", (int)pressVal);
   int textWidth = strlen(buf) * 12;
-  tft.fillRect(110, 200, textWidth + 4, 28, TFT_WHITE);
-  drawAsciiString24(buf, 112, 200, TFT_BLACK);
+  tft.fillRect(110, 160, textWidth + 4, 28, TFT_BLACK);
+  drawAsciiString24(buf, 112, 160, TFT_WHITE);
   snprintf(buf, sizeof(buf), "%02d", (int)tempVal);
   textWidth = strlen(buf) * 12;
-  tft.fillRect(310, 200, textWidth + 4, 28, TFT_WHITE);
-  drawAsciiString24(buf, 310, 200, TFT_BLACK);
+  tft.fillRect(310, 160, textWidth + 4, 28, TFT_BLACK);
+  drawAsciiString24(buf, 310, 160, TFT_WHITE);
 }
 
 // ====== 密码验证页 (mode=8) ======
@@ -1929,6 +1943,7 @@ void processKeys() {
         paramEditVal[paramSel] = paramEditVal[paramSel] - digit * div + newDigit * div;
         animateDigitScroll(200 + paramDpos * 14, 32 + paramSel * 34, '0' + digit, '0' + newDigit, TFT_YELLOW, COLOR_SPACEGREY);
       } else if (mode == 7) {
+        mode = 3; drawScreen();
       } else if (mode == 8) {
         int div = (pwdDpos == 0) ? 100 : (pwdDpos == 1) ? 10 : 1;
         int digit = (inputPwd / div) % 10;
