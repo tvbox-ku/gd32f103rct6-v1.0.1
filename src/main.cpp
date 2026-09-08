@@ -1277,9 +1277,9 @@ void drawDebugScreen() {
   tft.fillRect(cx - 3, cy - 8, 6, 15, TFT_BLACK);
   tft.fillRect(cx - 3, cy + 10, 6, 5, TFT_BLACK);
 
-  // 警告文字（白色大字居中）
-  drawTitleString("危险区域严禁在现场使用", 70, 95, TFT_WHITE);
-  drawTitleString("可能导致爆炸请确认安全", 53, 135, TFT_WHITE);
+  // 警告文字（白色，24x24字体，分两行居中）
+  drawMixedString("危险区域严禁在现场使用", 110, 105, TFT_WHITE, 1.0f);
+  drawMixedString("可能导致爆炸请确认安全", 97, 135, TFT_WHITE, 1.0f);
 
   // 底部两个按钮并排：左绿"返回主页"(KEY1)，右红"确认调试"(KEY3)
   int btnW = 180, btnH = 40, btnY = 230, gap = 20;
