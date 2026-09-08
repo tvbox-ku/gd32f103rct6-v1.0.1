@@ -1582,12 +1582,26 @@ void updateParamScreen() {
 
 // ====== 显示模式调度 ======
 void drawConfirmExitScreen() {
-  tft.fillScreen(TFT_WHITE);
-  drawMixedString("返回主页", 162, 88, TFT_BLACK, 1.5f);
-  drawMixedString("将停止正压运行", 149, 130, TFT_BLACK, 1.0f);
-  drawMixedString("并关闭所有继电器", 136, 160, TFT_BLACK, 1.0f);
-  drawBtn(0, "取消", TFT_DARKGREY);
-  drawBtn(2, "确认", TFT_RED);
+  tft.fillScreen(TFT_BLACK);
+
+  // 警告图标：红色三角形 + 白色感叹号
+  int cx = 240, cy = 70, sz = 22;
+  tft.fillTriangle(cx, cy - sz, cx - sz, cy + sz, cx + sz, cy + sz, TFT_RED);
+  tft.fillRect(cx - 2, cy - 8, 4, 14, TFT_WHITE);
+  tft.fillRect(cx - 2, cy + 10, 4, 4, TFT_WHITE);
+
+  // 警告文字（白色，分两行居中）
+  drawMixedString("警告：返回主页将停止正压运行", 78, 115, TFT_WHITE, 1.0f);
+  drawMixedString("并关闭所有继电器", 136, 145, TFT_WHITE, 1.0f);
+
+  // 底部两个按钮并排：左红"确认返回"(KEY3)，右绿"取消"(KEY1)
+  int btnW = 180, btnH = 40, btnY = 230, gap = 20;
+  int btn0X = (W - btnW * 2 - gap) / 2;
+  int btn1X = btn0X + btnW + gap;
+  tft.fillRect(btn0X, btnY, btnW, btnH, TFT_RED);
+  drawMixedString("确认返回", btn0X + (btnW - 4 * 26) / 2, btnY + 8, TFT_WHITE, 1.0f);
+  tft.fillRect(btn1X, btnY, btnW, btnH, TFT_DARKGREEN);
+  drawMixedString("取消", btn1X + (btnW - 2 * 26) / 2, btnY + 8, TFT_WHITE, 1.0f);
 }
 
 void drawScreen() {
