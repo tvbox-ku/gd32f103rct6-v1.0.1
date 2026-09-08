@@ -1904,7 +1904,11 @@ void processKeys() {
       } else if (mode == 2) {
         mode = 0; drawScreen();
       } else if (mode == 3) {
-        mode = 7; drawScreen();
+        mode = 7;
+        digitalWrite(POWER_RELAY, HIGH);
+        powerTripLatched = false;
+        underPressureTimer = 0;
+        drawScreen();
       } else if (mode == 4) {
         int div = (pwdDpos == 0) ? 100 : (pwdDpos == 1) ? 10 : 1;
         int digit = (inputPwd / div) % 10;
