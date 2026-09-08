@@ -1592,7 +1592,7 @@ void drawConfirmExitScreen() {
   tft.fillRect(cx - 3, cy + 12, 6, 6, TFT_BLACK);
 
   // 警告文字（白色，分两行居中）
-  drawMixedString("警告：返回主页将停止正压运行", 78, 115, TFT_WHITE, 1.0f);
+  drawMixedString("警告！返回主页将停止正压运行", 78, 115, TFT_WHITE, 1.0f);
   drawMixedString("并关闭所有继电器", 136, 145, TFT_WHITE, 1.0f);
 
   // 底部两个按钮并排：左红"确认返回"(KEY3)，右绿"取消"(KEY1)
