@@ -1922,7 +1922,27 @@ void processKeys() {
         inputPwd = inputPwd - digit * div + newDigit * div;
         animateDigitScroll(150 + pwdDpos * 14, 100, '0' + digit, '0' + newDigit, TFT_YELLOW, TFT_BLACK);
       } else if (mode == 9) {
-        mode = 1;
+        systemActive = false;
+        inPositiveMode = false;
+        countdownRemain = 0;
+        countdownDoneFirstRun = false;
+        powerTripLatched = false;
+        powerOnDelivered = false;
+        underPressureTimer = 0;
+        recoveryTimeoutTimer = 0;
+        recoveryTimeoutAlarm = false;
+        globalAlarm = false;
+        muteOn = false;
+        systemRunningNormal = false;
+        initialCheckDone = false;
+        resetCountdownVentilationState();
+        runElapsedSec = 0;
+        runTimer = 0;
+        digitalWrite(POWER_RELAY, LOW);
+        digitalWrite(INLET_RELAY, LOW);
+        digitalWrite(EXHAUST_RELAY, LOW);
+        digitalWrite(ALARM_RELAY, LOW);
+        mode = 0;
         drawScreen();
       }
     }
@@ -2037,27 +2057,7 @@ void processKeys() {
             }
         }
       } else if (mode == 9) {
-        systemActive = false;
-        inPositiveMode = false;
-        countdownRemain = 0;
-        countdownDoneFirstRun = false;
-        powerTripLatched = false;
-        powerOnDelivered = false;
-        underPressureTimer = 0;
-        recoveryTimeoutTimer = 0;
-        recoveryTimeoutAlarm = false;
-        globalAlarm = false;
-        muteOn = false;
-        systemRunningNormal = false;
-        initialCheckDone = false;
-        resetCountdownVentilationState();
-        runElapsedSec = 0;
-        runTimer = 0;
-        digitalWrite(POWER_RELAY, LOW);
-        digitalWrite(INLET_RELAY, LOW);
-        digitalWrite(EXHAUST_RELAY, LOW);
-        digitalWrite(ALARM_RELAY, LOW);
-        mode = 0;
+        mode = 1;
         drawScreen();
       }
     }
