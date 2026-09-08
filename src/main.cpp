@@ -1268,14 +1268,27 @@ void updateSettingsMenu() {
 
 // ====== 系统调试 (mode=3) ======
 void drawDebugScreen() {
-  tft.fillScreen(TFT_WHITE);
-  tft.fillRect(W - 95, 3, 70, 30, TFT_WHITE);
-  drawMixedString("系统调试", 5, 5, TFT_BLACK, 1.0f);
-  drawTitleString("危险区域严禁在现场使用", 60, 80, TFT_RED);
-  drawTitleString("可能导致爆炸请确认安全", 60, 120, TFT_RED);
-  drawBtn(0, "返回主页", TFT_DARKGREY);
-  drawBtn(1, "", TFT_WHITE);
-  drawBtn(2, "确认调试", TFT_DARKGREY);
+  tft.fillScreen(TFT_BLACK);
+
+  // 警告图标：黄色三角形 + 粗黑边框 + 黑色感叹号
+  int cx = 240, cy = 55, sz = 22, bw = 3;
+  tft.fillTriangle(cx, cy - sz, cx - sz, cy + sz, cx + sz, cy + sz, TFT_BLACK);
+  tft.fillTriangle(cx, cy - sz + bw, cx - sz + bw, cy + sz - bw, cx + sz - bw, cy + sz - bw, TFT_YELLOW);
+  tft.fillRect(cx - 3, cy - 8, 6, 15, TFT_BLACK);
+  tft.fillRect(cx - 3, cy + 10, 6, 5, TFT_BLACK);
+
+  // 警告文字（白色大字居中）
+  drawTitleString("危险区域严禁在现场使用", 70, 95, TFT_WHITE);
+  drawTitleString("可能导致爆炸请确认安全", 53, 135, TFT_WHITE);
+
+  // 底部两个按钮并排：左绿"返回主页"(KEY1)，右红"确认调试"(KEY3)
+  int btnW = 180, btnH = 40, btnY = 230, gap = 20;
+  int btn0X = (W - btnW * 2 - gap) / 2;
+  int btn1X = btn0X + btnW + gap;
+  tft.fillRect(btn0X, btnY, btnW, btnH, TFT_DARKGREEN);
+  drawMixedString("返回主页", btn0X + (btnW - 4 * 26) / 2, btnY + 8, TFT_WHITE, 1.0f);
+  tft.fillRect(btn1X, btnY, btnW, btnH, TFT_RED);
+  drawMixedString("确认调试", btn1X + (btnW - 4 * 26) / 2, btnY + 8, TFT_WHITE, 1.0f);
 }
 
 // ====== 调试确认页 (mode=7) ====== 
@@ -1592,7 +1605,7 @@ void drawConfirmExitScreen() {
   tft.fillRect(cx - 3, cy + 12, 6, 6, TFT_BLACK);
 
   // 警告文字（白色，分两行居中）
-  drawMixedString("警告！返回主页将停止正压运行", 78, 115, TFT_WHITE, 1.0f);
+  drawMixedString("警告!返回主页将停止正压运行", 78, 115, TFT_WHITE, 1.0f);
   drawMixedString("并关闭所有继电器", 136, 145, TFT_WHITE, 1.0f);
 
   // 底部两个按钮并排：左红"确认返回"(KEY3)，右绿"取消"(KEY1)
