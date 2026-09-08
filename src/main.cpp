@@ -1584,10 +1584,13 @@ void updateParamScreen() {
 void drawConfirmExitScreen() {
   tft.fillScreen(TFT_BLACK);
 
-  // 警告图标：黄色三角形 + 黑色边框 + 黑色感叹号
-  int cx = 240, cy = 70, sz = 22;
-  tft.fillTriangle(cx, cy - sz, cx - sz, cy + sz, cx + sz, cy + sz, TFT_YELLOW);
-  tft.drawTriangle(cx, cy - sz, cx - sz, cy + sz, cx + sz, cy + sz, TFT_BLACK);
+  // 警告图标：黄色圆角三角形 + 黑色粗边框 + 黑色感叹号
+  int cx = 240, cy = 70, sz = 24, bw = 3, r = 4;
+  tft.fillTriangle(cx, cy - sz, cx - sz, cy + sz, cx + sz, cy + sz, TFT_BLACK);
+  tft.fillTriangle(cx, cy - sz + bw, cx - sz + bw, cy + sz - bw, cx + sz - bw, cy + sz - bw, TFT_YELLOW);
+  tft.fillCircle(cx, cy - sz + r, r, TFT_YELLOW);
+  tft.fillCircle(cx - sz + r, cy + sz - r, r, TFT_YELLOW);
+  tft.fillCircle(cx + sz - r, cy + sz - r, r, TFT_YELLOW);
   tft.fillRect(cx - 2, cy - 8, 4, 14, TFT_BLACK);
   tft.fillRect(cx - 2, cy + 10, 4, 4, TFT_BLACK);
 
