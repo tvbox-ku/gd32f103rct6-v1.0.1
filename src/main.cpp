@@ -3,7 +3,7 @@
  *
  * 引脚: PB0-PB15=TFT_D0-D15, PA2=DC, PA4=CS, PA5=WR, PA3=RD, PA1=RST
  * 按键: PC7=KEY1, PC8=KEY2, PC9=KEY3, PA12=蜂鸣器
- * 继电器: PC0=排气, PC1=警报, PC2=进气, PC3=送电
+ * 继电器: PC0=进气, PC1=送电, PC12=警报, PD2=排气
  * ADC: PC5=温度(ADC15), PC4=压力(ADC14), PC2=ADC1(ADC12), PC3=ADC2(ADC13)
  */
 
@@ -51,6 +51,18 @@ static bool universalPwdUsed = false;
 static uint16_t targetPassword = DEFAULT_PASSWORD;
 static uint8_t mode = 0;
 
+static uint32_t toastTimer = 0;
+static uint16_t toastDuration = 0;
+static uint8_t toastNextMode = 0;
+static bool toastActive = false;
+
+static void showToast(uint16_t durationMs, uint8_t nextMode) {
+    toastTimer = millis();
+    toastDuration = durationMs;
+    toastNextMode = nextMode;
+    toastActive = true;
+}
+
 static void setBacklight(bool on) {
   if (TFT_BL_PIN >= 0) {
     digitalWrite(TFT_BL_PIN, on ? HIGH : LOW);
@@ -74,7 +86,7 @@ static float tempVal = 0.0f;
 static bool tempSensorAbnormal = false;
 static bool pressSensorAbnormal = false;
 static int32_t countdownRemain = 0;
-static bool inPositiveMode = false, needRedraw = false;
+static bool inPositiveMode = false;
 static uint32_t modeTimer = 0;
 static uint32_t sampleTimer = 0;
 static bool systemActive = false;
@@ -88,6 +100,8 @@ static uint32_t idleTimer = 0;
 // ====== 压力控制与欠压保护 ======
 static bool powerTripLatched = false;       // 欠压断电锁定（10秒未恢复）
 static uint32_t underPressureTimer = 0;     // 欠压计时起始时刻
+static uint32_t powerRecoveryTimer = 0;     // 断电后恢复防抖计时
+#define POWER_RECOVERY_DEBOUNCE_MS 3000     // 压力恢复到下限持续3秒才解除断电
 static bool countdownDoneFirstRun = false;  // 倒计时已完成标记
 static bool powerOnDelivered = false;       // 首次送电是否已完成
 static uint32_t runElapsedSec = 0;          // 运行时长（秒）
@@ -127,7 +141,6 @@ static int32_t calibInitTemp = 0, calibInitPress = 0;
 static bool calibSaved = false;
 
 // ====== 参数编辑 ======
-static uint8_t paramMode = 0;
 static uint8_t paramSel = 0, paramDpos = 0;
 static int32_t paramEditVal[6] = {0};
 static uint8_t paramLastSel = 255;
@@ -136,7 +149,6 @@ static uint8_t paramLastSel = 255;
 static uint8_t settingsSel = 0;
 
 // ====== 密码界面 ======
-static uint8_t pwdMode = 0;
 static uint16_t inputPwd = 0;
 static uint8_t pwdDpos = 0;
 static uint8_t verifyAttempts = 3;
@@ -152,13 +164,16 @@ static uint8_t pwdTargetMode = 2;   // 默认进入系统设置 (mode=2)
 
 // ====== ADC ======
 static bool adcHwReady = false;
+static bool adcError = false;
 static void adcInit() {
   __HAL_RCC_ADC1_CLK_ENABLE();
   ADC1->CR2 |= ADC_CR2_RSTCAL;
   uint32_t to = 200000;
   while ((ADC1->CR2 & ADC_CR2_RSTCAL) && --to);
+  if (to == 0) { adcError = true; return; }
   ADC1->CR2 |= ADC_CR2_CAL; to = 200000;
   while ((ADC1->CR2 & ADC_CR2_CAL) && --to);
+  if (to == 0) { adcError = true; return; }
   ADC1->CR1 &= ~ADC_CR1_SCAN;
   ADC1->CR2 &= ~(ADC_CR2_CONT | ADC_CR2_EXTTRIG);
   ADC1->SMPR1 = ADC_SMPR1_SMP10_2 | ADC_SMPR1_SMP10_1 | ADC_SMPR1_SMP10_0;
@@ -176,6 +191,7 @@ static inline uint16_t adcReadChannel(uint8_t ch) {
   ADC1->CR2 |= ADC_CR2_SWSTART;
   uint32_t t = 500000;
   while (!(ADC1->SR & ADC_SR_EOC) && --t);
+  if (t == 0) { adcError = true; return 0; }
   return ADC1->DR;
 }
 // 16 次采样取平均：用于校准基准、恢复出厂等关键采点，避免单次采样受噪声/干扰影响
@@ -188,25 +204,90 @@ static inline uint16_t adcReadAvg(uint8_t ch) {
   return (uint16_t)(sum / 16);
 }
 
-// ====== 蜂鸣器 ======
-void beep(uint8_t n, uint16_t onMs = 100, uint16_t offMs = 100) {
-  for (uint8_t i = 0; i < n; i++) {
+// ====== 蜂鸣器（非阻塞） ======
+static volatile uint8_t beepRemaining = 0;
+static uint16_t beepOnMs = 100, beepOffMs = 100;
+static uint32_t beepTimer = 0;
+static bool beepOn = false;
+
+void beepStart(uint8_t n, uint16_t onMs = 100, uint16_t offMs = 100) {
+    beepRemaining = n;
+    beepOnMs = onMs;
+    beepOffMs = offMs;
+    beepOn = true;
+    beepTimer = millis();
     digitalWrite(BEEP_PIN, HIGH);
-    if (onMs > 0) delay(onMs);
-    digitalWrite(BEEP_PIN, LOW);
-    if (offMs > 0 && i < n - 1) delay(offMs);
-  }
+}
+
+void beepUpdate() {
+    if (beepRemaining == 0) return;
+    if (beepOn) {
+        if (millis() - beepTimer >= beepOnMs) {
+            digitalWrite(BEEP_PIN, LOW);
+            beepOn = false;
+            beepRemaining--;
+            if (beepRemaining > 0 && beepOffMs > 0) {
+                beepTimer = millis();
+            } else {
+                beepRemaining = 0;
+            }
+        }
+    } else {
+        if (millis() - beepTimer >= beepOffMs) {
+            beepOn = true;
+            beepTimer = millis();
+            digitalWrite(BEEP_PIN, HIGH);
+        }
+    }
+}
+
+void beep(uint8_t n, uint16_t onMs = 100, uint16_t offMs = 100) {
+    for (uint8_t i = 0; i < n; i++) {
+        digitalWrite(BEEP_PIN, HIGH);
+        if (onMs > 0) delay(onMs);
+        digitalWrite(BEEP_PIN, LOW);
+        if (offMs > 0 && i < n - 1) delay(offMs);
+    }
 }
 
 // ====== 中文字库绘制 ======
 void drawAsciiChar24(char ch, int x, int y, uint16_t color, float scale = 1.0f);
+
+static int16_t* fontSortedIdx = nullptr;
+static int fontSortedCount = 0;
+
+static int fontCmp(const void* a, const void* b) {
+    int16_t ia = *(const int16_t*)a, ib = *(const int16_t*)b;
+    return strcmp(font_24[ia].index, font_24[ib].index);
+}
+
+static void initFontSortedIdx() {
+    fontSortedCount = FONT_COUNT;
+    fontSortedIdx = (int16_t*)malloc(fontSortedCount * sizeof(int16_t));
+    for (int i = 0; i < fontSortedCount; i++) fontSortedIdx[i] = (int16_t)i;
+    qsort(fontSortedIdx, fontSortedCount, sizeof(int16_t), fontCmp);
+}
+
 void drawChineseChar(const char* ch, int x, int y, uint16_t color, float scale = 1.0f, bool bold = false) {
-  for (int i = 0; i < FONT_COUNT; i++) {
-    if (strcmp(font_24[i].index, ch) == 0) {
+  int idx = -1;
+  if (fontSortedIdx != nullptr) {
+    int lo = 0, hi = fontSortedCount - 1;
+    while (lo <= hi) {
+      int mid = (lo + hi) / 2;
+      int cmp = strcmp(font_24[fontSortedIdx[mid]].index, ch);
+      if (cmp == 0) { idx = fontSortedIdx[mid]; break; }
+      if (cmp < 0) lo = mid + 1; else hi = mid - 1;
+    }
+  } else {
+    for (int i = 0; i < FONT_COUNT; i++) {
+      if (strcmp(font_24[i].index, ch) == 0) { idx = i; break; }
+    }
+  }
+  if (idx >= 0) {
       for (int row = 0; row < 24; row++) {
         for (int col = 0; col < 24; col++) {
           int byteIdx = row * 3 + col / 8;
-          if (font_24[i].matrix[byteIdx] & (0x01 << (col % 8))) {
+          if (font_24[idx].matrix[byteIdx] & (0x01 << (col % 8))) {
             int px = (int)(col * scale), py = (int)(row * scale);
             int pw = (int)((col + 1) * scale) - px, ph = (int)((row + 1) * scale) - py;
             if (pw < 1) pw = 1; if (ph < 1) ph = 1;
@@ -215,8 +296,6 @@ void drawChineseChar(const char* ch, int x, int y, uint16_t color, float scale =
           }
         }
       }
-      return;
-    }
   }
 }
 void drawMixedString(const char* str, int x, int y, uint16_t color, float scale = 1.0f, bool bold = false) {
@@ -446,90 +525,43 @@ static float filteredTempRaw = -1.0f;
 static float filteredAdc1Raw = -1.0f;
 static float filteredAdc2Raw = -1.0f;
 
+static float adcSampleFiltered(uint8_t ch, float* filteredRaw, float alpha, bool* abnormal) {
+    int sum = 0, n = 16;
+    int minRaw = 4095, maxRaw = 0;
+    for (int i = 0; i < n; i++) {
+        int raw = adcReadChannel(ch);
+        sum += raw;
+        if (raw < minRaw) minRaw = raw;
+        if (raw > maxRaw) maxRaw = raw;
+    }
+    float currentRaw = (float)sum / n;
+    if (abnormal) *abnormal = (minRaw <= 5 || maxRaw >= 4090);
+    if (*filteredRaw < 0.0f) {
+        *filteredRaw = currentRaw;
+    } else {
+        *filteredRaw = *filteredRaw * (1.0f - alpha) + currentRaw * alpha;
+    }
+    return *filteredRaw;
+}
+
 float calcDisplayPress() {
-  int sum = 0, n = 16;
-  int minRaw = 4095, maxRaw = 0;
-  for (int i = 0; i < n; i++) {
-    int raw = adcReadChannel(PRESS_ADC_CH);
-    sum += raw;
-    if (raw < minRaw) minRaw = raw;
-    if (raw > maxRaw) maxRaw = raw;
-  }
-  float currentRaw = (float)sum / n;
-  pressSensorAbnormal = (minRaw <= 5 || maxRaw >= 4090);
-
-  if (filteredPressRaw < 0.0f) {
-    filteredPressRaw = currentRaw;
-  } else {
-    const float alpha = 0.2f;
-    filteredPressRaw = filteredPressRaw * (1.0f - alpha) + currentRaw * alpha;
-  }
-
-  float v = calibPressVal + (filteredPressRaw - calibPressRaw) * PRESS_SLOPE;
-  return (v < 0) ? 0 : v;
+    float fr = adcSampleFiltered(PRESS_ADC_CH, &filteredPressRaw, 0.2f, &pressSensorAbnormal);
+    float v = calibPressVal + (fr - calibPressRaw) * PRESS_SLOPE;
+    return (v < 0) ? 0 : v;
 }
 float calcDisplayTemp() {
-  int sum = 0, n = 16;
-  int minRaw = 4095, maxRaw = 0;
-  for (int i = 0; i < n; i++) {
-    int raw = adcReadChannel(TEMP_ADC_CH);
-    sum += raw;
-    if (raw < minRaw) minRaw = raw;
-    if (raw > maxRaw) maxRaw = raw;
-  }
-  float currentRaw = (float)sum / n;
-  tempSensorAbnormal = (minRaw <= 5 || maxRaw >= 4090);
-
-  if (filteredTempRaw < 0.0f) {
-    filteredTempRaw = currentRaw;
-  } else {
-    const float alpha = 0.12f; 
-    filteredTempRaw = filteredTempRaw * (1.0f - alpha) + currentRaw * alpha;
-  }
-
-  return calibTempVal + (filteredTempRaw - calibTempRaw) * TEMP_COEFF * 3.3f / 4095.0f * 1000.0f;
+    float fr = adcSampleFiltered(TEMP_ADC_CH, &filteredTempRaw, 0.12f, &tempSensorAbnormal);
+    return calibTempVal + (fr - calibTempRaw) * TEMP_COEFF * 3.3f / 4095.0f * 1000.0f;
 }
 float calcAdc1() {
-  int sum = 0, n = 16;
-  int minRaw = 4095, maxRaw = 0;
-  for (int i = 0; i < n; i++) {
-    int raw = adcReadChannel(ADC1_CH);
-    sum += raw;
-    if (raw < minRaw) minRaw = raw;
-    if (raw > maxRaw) maxRaw = raw;
-  }
-  float currentRaw = (float)sum / n;
-
-  if (filteredAdc1Raw < 0.0f) {
-    filteredAdc1Raw = currentRaw;
-  } else {
-    const float alpha = 0.12f; 
-    filteredAdc1Raw = filteredAdc1Raw * (1.0f - alpha) + currentRaw * alpha;
-  }
-
-  float v = calibAdc1Val + (filteredAdc1Raw - calibAdc1Raw) * ADC1_SLOPE;
-  return (v < 0) ? 0 : v;
+    float fr = adcSampleFiltered(ADC1_CH, &filteredAdc1Raw, 0.12f, nullptr);
+    float v = calibAdc1Val + (fr - calibAdc1Raw) * ADC1_SLOPE;
+    return (v < 0) ? 0 : v;
 }
 float calcAdc2() {
-  int sum = 0, n = 16;
-  int minRaw = 4095, maxRaw = 0;
-  for (int i = 0; i < n; i++) {
-    int raw = adcReadChannel(ADC2_CH);
-    sum += raw;
-    if (raw < minRaw) minRaw = raw;
-    if (raw > maxRaw) maxRaw = raw;
-  }
-  float currentRaw = (float)sum / n;
-
-  if (filteredAdc2Raw < 0.0f) {
-    filteredAdc2Raw = currentRaw;
-  } else {
-    const float alpha = 0.12f; 
-    filteredAdc2Raw = filteredAdc2Raw * (1.0f - alpha) + currentRaw * alpha;
-  }
-
-  float v = calibAdc2Val + (filteredAdc2Raw - calibAdc2Raw) * ADC2_SLOPE;
-  return (v < 0) ? 0 : v;
+    float fr = adcSampleFiltered(ADC2_CH, &filteredAdc2Raw, 0.12f, nullptr);
+    float v = calibAdc2Val + (fr - calibAdc2Raw) * ADC2_SLOPE;
+    return (v < 0) ? 0 : v;
 }
 
 static bool hasSafetyAlert() {
@@ -645,9 +677,22 @@ void updatePressureControl() {
                 digitalWrite(POWER_RELAY, LOW);
             }
         }
+        powerRecoveryTimer = 0;
+    } else if (powerTripLatched) {
+        if (p >= sysParams[0]) {
+            if (powerRecoveryTimer == 0) {
+                powerRecoveryTimer = millis();
+            } else if (millis() - powerRecoveryTimer >= POWER_RECOVERY_DEBOUNCE_MS) {
+                powerTripLatched = false;
+                powerRecoveryTimer = 0;
+            }
+        } else {
+            powerRecoveryTimer = 0;
+        }
+        underPressureTimer = 0;
     } else {
         underPressureTimer = 0;
-        powerTripLatched = false;
+        powerRecoveryTimer = 0;
     }
 
     // --- 压力恢复超时报警（仅换气倒计时结束后检测，倒计时期间不触发任何压力警报） ---
@@ -1695,11 +1740,8 @@ void saveSysParams() {
     flashSaveAll();
 }
 
-void loadSysParams() {
-}
-
 // ====== 按键处理 ======
-#define KEY_DEBOUNCE_MS 15
+#define KEY_DEBOUNCE_MS 20
 #define KEY_LONG_PRESS_MS 3000
 static bool lastK1 = HIGH, lastK2 = HIGH, lastK3 = HIGH;
 static uint32_t k1PressTime = 0, k2PressTime = 0, k3PressTime = 0;
@@ -1746,41 +1788,37 @@ void processKeys() {
   // 长按
   if (k1 == LOW && !k1LongFired && now - k1PressTime >= KEY_LONG_PRESS_MS) {
     k1LongFired = true;
-    if (mode == 8) { beep(3); mode = 0; drawScreen(); }
+    if (mode == 8) { beepStart(3); mode = 0; drawScreen(); }
   }
   if (k2 == LOW && !k2LongFired && now - k2PressTime >= KEY_LONG_PRESS_MS) {
     k2LongFired = true;
-    if (mode == 4) { beep(3); mode = 2; drawScreen(); }
+    if (mode == 4) { beepStart(3); mode = 2; drawScreen(); }
     if (mode == 5) {
-      beep(3);
+      beepStart(3);
       calibEditTemp = calibInitTemp;
       calibEditPress = calibInitPress;
       calibDpos = 0;
       tft.fillRect(80, 120, 320, 60, TFT_BLACK);
       tft.drawRect(80, 120, 320, 60, TFT_WHITE);
       drawMixedString("放弃修改", 150, 142, TFT_YELLOW, 1.5f);
-      delay(1500);
-      mode = 2;
-      drawScreen();
+      showToast(1500, 2);
     }
     if (mode == 6) {
-      beep(3);
+      beepStart(3);
       for (int i = 0; i < 6; i++) paramEditVal[i] = sysParams[i];
       paramDpos = 0;
       tft.fillRect(80, 120, 320, 60, TFT_BLACK);
       tft.drawRect(80, 120, 320, 60, TFT_WHITE);
       drawMixedString("放弃修改", 150, 142, TFT_YELLOW, 1.5f);
-      delay(1500);
-      mode = 2;
-      drawScreen();
+      showToast(1500, 2);
     }
   }
   // KEY3 长按：保存
   if (k3 == LOW && !k3LongFired && now - k3PressTime >= KEY_LONG_PRESS_MS) {
     k3LongFired = true;
-    if (mode == 4) { beep(3); targetPassword = inputPwd; saveSysParams(); tft.fillRect(60, 100, 360, 50, TFT_BLACK); tft.drawRect(60, 100, 360, 50, TFT_WHITE); drawMixedString("密码已修改", 160, 115, TFT_GREEN, 1.5f); delay(1500); mode = 2; drawScreen(); }
+    if (mode == 4) { beepStart(3); targetPassword = inputPwd; saveSysParams(); tft.fillRect(60, 100, 360, 50, TFT_BLACK); tft.drawRect(60, 100, 360, 50, TFT_WHITE); drawMixedString("密码已修改", 160, 115, TFT_GREEN, 1.5f); showToast(1500, 2); }
     if (mode == 5) {
-      beep(3);
+      beepStart(3);
       int currentTempAdc = adcReadAvg(TEMP_ADC_CH);
       int currentPressAdc = adcReadAvg(PRESS_ADC_CH);
       float tempCoeff = TEMP_COEFF * 3.3f / 4095.0f * 1000.0f;
@@ -1791,23 +1829,19 @@ void processKeys() {
       tft.fillRect(80, 120, 320, 60, TFT_BLACK);
       tft.drawRect(80, 120, 320, 60, TFT_WHITE);
       drawMixedString("参数已保存", 150, 142, TFT_GREEN, 1.5f);
-      delay(1500);
-      mode = 2;
-      drawScreen();
+      showToast(1500, 2);
     }
     if (mode == 6) {
-      beep(3);
+      beepStart(3);
       for (int i = 0; i < 6; i++) sysParams[i] = paramEditVal[i];
       saveSysParams();
       tft.fillRect(80, 120, 320, 60, TFT_BLACK);
       tft.drawRect(80, 120, 320, 60, TFT_WHITE);
       drawMixedString("参数已保存", 150, 142, TFT_GREEN, 1.5f);
-      delay(1500);
-      mode = 2;
-      drawScreen();
+      showToast(1500, 2);
     }
     if (mode == 2 && settingsSel == 3) {
-      beep(3);
+      beepStart(3);
       for (int i = 0; i < 6; i++) sysParams[i] = DEFAULT_SYSPARAMS[i];
       targetPassword = DEFAULT_PASSWORD;
       filteredPressRaw = -1.0f;
@@ -1853,9 +1887,7 @@ void processKeys() {
       tft.fillRect(60, 120, 360, 60, TFT_BLACK);
       tft.drawRect(60, 120, 360, 60, TFT_WHITE);
       drawMixedString("已恢复出厂", 160, 142, TFT_GREEN, 1.5f);
-      delay(2000);
-      mode = 0;
-      drawScreen();
+      showToast(2000, 0);
     }
   }
   // 按键释放检测 & 短按
@@ -2038,7 +2070,7 @@ void processKeys() {
       }
       else if (mode == 2) {
         switch (settingsSel) {
-          case 0: pwdMode = 0; inputPwd = 0; pwdDpos = 0; mode = 4; break;
+          case 0: inputPwd = 0; pwdDpos = 0; mode = 4; break;
           case 1:
             calibSel = 1;
             calibDpos = 0;
@@ -2047,7 +2079,7 @@ void processKeys() {
             calibInitPress = calibEditPress;
             mode = 5;
             break;
-          case 2: paramMode = 0; paramSel = 0; paramDpos = 0; mode = 6; break;
+          case 2: paramSel = 0; paramDpos = 0; mode = 6; break;
           case 3:
             mode = 0; break;
         }
@@ -2081,12 +2113,12 @@ void processKeys() {
         } else {
             verifyAttempts--;
             if (verifyAttempts == 0) {
-                beep(3, 100, 100);
+                beepStart(3, 100, 100);
                 verifyAttempts = 3;
                 mode = 0;                       
                 drawScreen();
             } else {
-                beep(2, 80, 80);
+                beepStart(2, 80, 80);
                 inputPwd = 0;
                 pwdDpos = 0;
                 drawPasswordVerifyScreen();     
@@ -2111,7 +2143,7 @@ struct FlashData {
     int32_t calibTempRaw;
     float calibPressVal;
     int32_t calibPressRaw;
-    float calibAdc1Val;
+    float calibAdc1Val; 
     int32_t calibAdc1Raw;
     float calibAdc2Val;
     int32_t calibAdc2Raw;
@@ -2164,6 +2196,19 @@ void flashSaveAll() {
     HAL_FLASH_Lock();
 }
 
+static bool validateSysParams() {
+    int32_t pLoLo = sysParams[1], pLo = sysParams[0], pHi = sysParams[2], pHiHi = sysParams[3];
+    int32_t tHi = sysParams[4], purge = sysParams[5];
+    if (pLoLo < 0 || pLoLo > 500) return false;
+    if (pLo < 0 || pLo > 1000) return false;
+    if (pHi < 0 || pHi > 2000) return false;
+    if (pHiHi < 0 || pHiHi > 3000) return false;
+    if (tHi < 1 || tHi > 200) return false;
+    if (purge < 1 || purge > 3600) return false;
+    if (!(pLoLo < pLo && pLo < pHi && pHi < pHiHi)) return false;
+    return true;
+}
+
 bool flashLoadAll() {
     FlashData* d = (FlashData*)FLASH_SAVE_ADDR;
     if (d->magic == FLASH_MAGIC && flashCRC(d) == d->crc) {
@@ -2178,6 +2223,9 @@ bool flashLoadAll() {
         calibAdc2Raw = d->calibAdc2Raw;
         universalPwdUsed = (d->universalPwdUsed != 0);
         for (int i = 0; i < 6; i++) sysParams[i] = d->sysParams[i];
+        if (!validateSysParams()) {
+            for (int i = 0; i < 6; i++) sysParams[i] = DEFAULT_SYSPARAMS[i];
+        }
         calibSaved = true;
         return true;
     }
@@ -2197,7 +2245,9 @@ void setup() {
   }
   tft.fillScreen(TFT_BLACK); 
 
-  tft.writecommand(0x29);    
+  initFontSortedIdx();
+
+  tft.writecommand(0x29);
 
   pinMode(BEEP_PIN, OUTPUT); digitalWrite(BEEP_PIN, LOW);
   pinMode(KEY1_PIN, INPUT_PULLUP);
@@ -2220,7 +2270,6 @@ void setup() {
 
   adcInit();
   loadCalibration();
-  loadSysParams();
 
   beep(2, 80, 80);
 
@@ -2262,11 +2311,19 @@ void setup() {
 
 // ====== 主循环 ======
 void loop() {
+  beepUpdate();
+  if (toastActive) {
+    if (millis() - toastTimer >= toastDuration) {
+      toastActive = false;
+      mode = toastNextMode;
+      drawScreen();
+    }
+  }
   if (millis() - blinkTimer > 500) { blinkTimer = millis(); blinkOn = !blinkOn; }
   bool blinkChanged = (blinkOn != prevBlinkOn);
   prevBlinkOn = blinkOn;
 
-  processKeys();
+  if (!toastActive) processKeys();
 
   if (millis() - sampleTimer >= 100) {
     sampleTimer = millis();
@@ -2404,10 +2461,9 @@ void loop() {
     drawScreen();
   }
 
-  if (needRedraw) {
-    drawScreen();
-    needRedraw = false;
+  if (screenSleeping) {
+    __WFI();
+  } else {
+    delay(10);
   }
-
-  delay(120);
 }
