@@ -331,6 +331,8 @@
       <text x="161" y="21" text-anchor="middle" font-size="13" fill="#fff">送电</text>
       <rect x="194" y="2" width="62" height="28" fill="#e8e8ec"></rect>
       <text x="225" y="21" text-anchor="middle" font-size="13" fill="#333">警报</text>
+      <text x="300" y="21" font-size="12" fill="#333">运行</text>
+      <text x="330" y="21" font-size="13" font-weight="bold" fill="#333">00:00:15</text>
       <text x="20" y="70" font-size="16" fill="#333">柜内温度 :</text>
       <text x="200" y="72" font-size="18" font-weight="bold" fill="#333">26℃</text>
       <text x="20" y="112" font-size="16" fill="#333">柜内压力 :</text>
@@ -360,7 +362,8 @@
     <li><strong>柜内温度</strong>：PT100 实测柜温；</li>
     <li><strong>柜内压力</strong>：实时柜内正压值；</li>
     <li><strong>状态框</strong>：显示「柜内压力正常 / 柜内压力低 / 柜内压力高 / 系统运行中」，异常时红色闪烁；</li>
-    <li><strong>压力正常值</strong>：显示设定好的压力允许区间。</li>
+    <li><strong>压力正常值</strong>：显示设定好的压力允许区间；</li>
+    <li><strong>运行时间</strong>：倒计时结束后开始计时，显示系统已运行时长。格式：不足 100 小时显示 HH:MM:SS，超过 100 小时显示 DD天HH:MM，超过 100 天显示 DDD天HH:MM。</li>
   </ul>
 
   <h3>4.3 系统设置菜单</h3>
@@ -450,12 +453,28 @@
     <li>系统进入<strong>换气倒计时</strong>（默认 10 秒），期间自动控制进 / 排气阀对柜体进行吹扫换气；</li>
     <li>倒计时结束后进入运行界面，压力达到正常范围后系统<strong>自动送电</strong>接通负载；</li>
     <li>进入「系统运行中」状态，持续稳压、报警监测；</li>
-    <li>运行中按 <strong>KEY1</strong> 可对报警进行消音，按 <strong>KEY3</strong> 弹出确认界面，再按 <strong>KEY3</strong> 确认返回主页。</li>
+    <li>运行中按 <strong>KEY1</strong> 可对报警进行消音，按 <strong>KEY3</strong> 弹出确认界面，此时按 <strong>KEY1</strong> 确认返回主页，按 <strong>KEY3</strong> 取消并回到正压运行界面。</li>
   </ol>
   <p><strong>返回主页确认提醒：</strong>在正压运行界面按 KEY3 后，系统会弹出确认界面，提示"将停止正压运行并关闭所有继电器"。此时：</p>
+  <div class="figure">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 320" font-family="Microsoft YaHei, sans-serif">
+      <rect x="0" y="0" width="480" height="320" fill="#000"></rect>
+      <polygon points="240,44 214,96 266,96" fill="#000" stroke="#FFD700" stroke-width="4"></polygon>
+      <polygon points="240,48 218,92 262,92" fill="#FFD700"></polygon>
+      <rect x="237" y="60" width="6" height="18" fill="#000"></rect>
+      <rect x="237" y="82" width="6" height="6" fill="#000"></rect>
+      <text x="240" y="125" text-anchor="middle" font-size="16" fill="#fff">警告!返回主页将停止正压运行</text>
+      <text x="240" y="155" text-anchor="middle" font-size="16" fill="#fff">并关闭所有继电器</text>
+      <rect x="20" y="270" width="150" height="40" rx="6" fill="#c0392b"></rect>
+      <text x="95" y="295" text-anchor="middle" font-size="14" fill="#fff">确认返回</text>
+      <rect x="310" y="270" width="150" height="40" rx="6" fill="#2f855a"></rect>
+      <text x="385" y="295" text-anchor="middle" font-size="14" fill="#fff">取消</text>
+    </svg>
+    <div class="cap">图 5-2　正压运行返回主页确认界面</div>
+  </div>
   <ul>
-    <li>再按 <strong>KEY3</strong> 确认退出，停止正压运行并返回主页；</li>
-    <li>按 <strong>KEY1</strong> 或 <strong>KEY2</strong> 取消退出，返回正压运行界面继续运行。</li>
+    <li>按 <strong>KEY1（确认返回）</strong>确认退出，停止正压运行并返回主页；</li>
+    <li>按 <strong>KEY3（取消）</strong>取消退出，返回正压运行界面继续运行。</li>
   </ul>
   <div class="callout">返回主页会停止正压运行、关闭所有继电器、清空警报和计时器状态，不保留后台运行。请确认后再操作。</div>
 
@@ -493,6 +512,43 @@
     <li>阅读安全提示后，按 <strong>KEY1（确认调试）</strong>进入确认页，此时系统开启送电继电器；</li>
     <li>确认页显示"系统已送电!请确认安全。"及实时压力、温度，确认安全后按 <strong>KEY1 或 KEY3</strong> 返回主页。</li>
   </ol>
+  <div class="figure">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 320" font-family="Microsoft YaHei, sans-serif">
+      <rect x="0" y="0" width="480" height="320" fill="#000"></rect>
+      <polygon points="240,33 218,77 262,77" fill="#000" stroke="#FFD700" stroke-width="3"></polygon>
+      <polygon points="240,36 221,74 259,74" fill="#FFD700"></polygon>
+      <rect x="237" y="47" width="6" height="15" fill="#000"></rect>
+      <rect x="237" y="65" width="6" height="5" fill="#000"></rect>
+      <text x="240" y="110" text-anchor="middle" font-size="15" fill="#fff">警告!危险区域严禁在现场使用;</text>
+      <text x="240" y="140" text-anchor="middle" font-size="15" fill="#fff">可能导致爆炸,请确认安全。</text>
+      <rect x="20" y="270" width="150" height="40" rx="6" fill="#c0392b"></rect>
+      <text x="95" y="295" text-anchor="middle" font-size="14" fill="#fff">确认调试</text>
+      <rect x="310" y="270" width="150" height="40" rx="6" fill="#2f855a"></rect>
+      <text x="385" y="295" text-anchor="middle" font-size="14" fill="#fff">返回主页</text>
+    </svg>
+    <div class="cap">图 5-3　系统调试警告界面</div>
+  </div>
+  <p>调试警告界面采用黑底白字 + 黄色三角形警告图标布局。底部两个按钮：按动<strong>KEY1</strong>确认调试进入调试确认页，按动<strong>KEY3</strong>退出调试返回主页。</p>
+  <div class="figure">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 320" font-family="Microsoft YaHei, sans-serif">
+      <rect x="0" y="0" width="480" height="320" fill="#000"></rect>
+      <polygon points="240,33 218,77 262,77" fill="#000" stroke="#FFD700" stroke-width="3"></polygon>
+      <polygon points="240,36 221,74 259,74" fill="#FFD700"></polygon>
+      <rect x="237" y="47" width="6" height="15" fill="#000"></rect>
+      <rect x="237" y="65" width="6" height="5" fill="#000"></rect>
+      <text x="240" y="110" text-anchor="middle" font-size="15" fill="#fff">系统已送电!请确认安全。</text>
+      <text x="30" y="165" font-size="14" fill="#fff">压力:</text>
+      <text x="100" y="165" font-size="14" fill="#fff">0250</text>
+      <text x="140" y="165" font-size="14" fill="#fff">Pa</text>
+      <text x="230" y="165" font-size="14" fill="#fff">温度:</text>
+      <text x="300" y="165" font-size="14" fill="#fff">26</text>
+      <text x="325" y="165" font-size="14" fill="#fff">℃</text>
+      <rect x="315" y="270" width="150" height="40" rx="6" fill="#c0392b"></rect>
+      <text x="390" y="295" text-anchor="middle" font-size="14" fill="#fff">返回主页</text>
+    </svg>
+    <div class="cap">图 5-4　调试确认页界面</div>
+  </div>
+  <p>调试确认页显示"系统已送电!请确认安全。"警告文字及实时压力、温度值。底部右侧红色<strong>「返回主页」按钮</strong>，按动<strong>KEY3</strong>后关闭送电继电器并返回主页。</p>
   <div class="callout">进入调试确认页时系统会开启送电继电器，返回主页时自动关闭。请务必确认现场安全后再操作。</div>
 
   <!-- 六 -->

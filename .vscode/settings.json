@@ -1,3 +1,4 @@
 {
-    "cmake.sourceDirectory": "E:/hans/gd32f103rct6-v1.0.1/lib/TFT_eSPI-2.5.43"
+    "cmake.sourceDirectory": "E:/hans/gd32f103rct6-v1.0.1-main/lib/TFT_eSPI",
+    "platformio.python": "C:\\Users\\GZ\\AppData\\Local\\Programs\\Python\\Python312\\python.exe"
 }
