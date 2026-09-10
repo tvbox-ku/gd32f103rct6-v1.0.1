@@ -1,0 +1,801 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CYBER NEXUS // 刘半仙</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&family=JetBrains+Mono:wght@300;400;700&display=swap');
+
+:root {
+  --bg: #0a0a0f;
+  --card: #12121a;
+  --fg: #e0e0e0;
+  --muted: #6b7280;
+  --neon-green: #00ff88;
+  --neon-pink: #ff00ff;
+  --neon-cyan: #00d4ff;
+  --neon-red: #ff3366;
+  --neon-yellow: #ffdd00;
+  --border: #2a2a3a;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: 'JetBrains Mono', monospace;
+  overflow-x: hidden;
+  cursor: none;
+}
+
+/* 自定义光标 */
+.cursor-dot {
+  position: fixed; width: 8px; height: 8px;
+  background: var(--neon-green); border-radius: 50%;
+  pointer-events: none; z-index: 9999;
+  box-shadow: 0 0 20px var(--neon-green), 0 0 40px var(--neon-green);
+  transition: transform 0.1s ease;
+}
+.cursor-ring {
+  position: fixed; width: 40px; height: 40px;
+  border: 2px solid var(--neon-cyan); border-radius: 50%;
+  pointer-events: none; z-index: 9998;
+  box-shadow: 0 0 15px var(--neon-cyan);
+  transition: transform 0.15s ease, width 0.2s, height 0.2s, border-color 0.2s;
+}
+
+#particleCanvas, #bgCanvas {
+  position: fixed; top: 0; left: 0;
+  width: 100%; height: 100%;
+  pointer-events: none;
+}
+#bgCanvas { z-index: 0; }
+#particleCanvas { z-index: 1; }
+
+.grid-bg {
+  position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 0;
+  background-image:
+    linear-gradient(rgba(0,255,136,0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,255,136,0.04) 1px, transparent 1px);
+  background-size: 50px 50px;
+  transition: transform 0.3s ease-out;
+}
+
+.scanline {
+  position: fixed; top: 0; left: 0; width: 100%; height: 3px;
+  background: linear-gradient(90deg, transparent, var(--neon-green), transparent);
+  z-index: 2; pointer-events: none;
+  animation: scan 6s linear infinite; opacity: 0.4;
+}
+@keyframes scan { 0% { top: 0; } 100% { top: 100vh; } }
+
+/* 导航栏 */
+.nav {
+  position: fixed; top: 0; left: 0; width: 100%; z-index: 100;
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 15px 40px; background: rgba(10,10,15,0.8);
+  backdrop-filter: blur(10px); border-bottom: 1px solid var(--border);
+}
+.nav-logo {
+  font-family: 'Orbitron', monospace; font-weight: 900; font-size: 18px;
+  color: var(--neon-green); letter-spacing: 3px;
+  text-shadow: 0 0 10px var(--neon-green);
+}
+.nav-links { display: flex; gap: 30px; }
+.nav-links a {
+  font-family: 'Share Tech Mono', monospace; font-size: 13px;
+  color: var(--muted); text-decoration: none; letter-spacing: 2px;
+  transition: all 0.2s; position: relative;
+}
+.nav-links a:hover { color: var(--neon-cyan); text-shadow: 0 0 10px var(--neon-cyan); }
+.nav-links a::after {
+  content: ''; position: absolute; bottom: -5px; left: 0; width: 0; height: 2px;
+  background: var(--neon-cyan); transition: width 0.3s;
+}
+.nav-links a:hover::after { width: 100%; }
+
+.container {
+  position: relative; z-index: 3; min-height: 100vh;
+  display: flex; flex-direction: column; align-items: center;
+  padding: 100px 20px 40px;
+}
+
+/* 状态栏 */
+.status-bar {
+  display: flex; gap: 25px; flex-wrap: wrap; justify-content: center;
+  font-family: 'Share Tech Mono', monospace; font-size: 12px;
+  color: var(--muted); margin-bottom: 60px; letter-spacing: 2px;
+}
+.status-bar span { color: var(--neon-green); }
+.status-bar .blink { animation: blink 1.5s infinite; }
+@keyframes blink { 50% { opacity: 0.3; } }
+
+/* Hero */
+.hero { text-align: center; margin-bottom: 80px; position: relative; }
+.glitch-title {
+  font-family: 'Orbitron', monospace; font-size: clamp(48px, 10vw, 120px);
+  font-weight: 900; letter-spacing: 8px; color: var(--fg);
+  position: relative; text-shadow: 0 0 30px rgba(0,255,136,0.3);
+}
+.glitch-title::before, .glitch-title::after {
+  content: attr(data-text); position: absolute; top: 0; left: 0; width: 100%;
+}
+.glitch-title::before { color: var(--neon-pink); z-index: -1; animation: glitch-1 3s infinite; }
+.glitch-title::after { color: var(--neon-cyan); z-index: -2; animation: glitch-2 3s infinite; }
+@keyframes glitch-1 {
+  0%,100% { transform: translate(0); } 20% { transform: translate(-3px,2px); }
+  40% { transform: translate(3px,-2px); } 60% { transform: translate(-2px,-1px); } 80% { transform: translate(2px,1px); }
+}
+@keyframes glitch-2 {
+  0%,100% { transform: translate(0); } 20% { transform: translate(3px,-2px); }
+  40% { transform: translate(-3px,2px); } 60% { transform: translate(2px,1px); } 80% { transform: translate(-2px,-1px); }
+}
+.subtitle {
+  font-family: 'Share Tech Mono', monospace; font-size: 14px;
+  color: var(--neon-green); letter-spacing: 6px; margin-top: 20px; opacity: 0.7;
+}
+.author-name {
+  font-family: 'Orbitron', monospace; font-size: 28px; font-weight: 700;
+  color: var(--neon-cyan); letter-spacing: 10px; margin-top: 20px;
+  text-shadow: 0 0 20px var(--neon-cyan), 0 0 40px rgba(0,212,255,0.3);
+  display: inline-block; animation: namePulse 2s ease-in-out infinite;
+}
+@keyframes namePulse {
+  0%,100% { text-shadow: 0 0 20px var(--neon-cyan), 0 0 40px rgba(0,212,255,0.3); }
+  50% { text-shadow: 0 0 30px var(--neon-cyan), 0 0 60px rgba(0,212,255,0.5); }
+}
+
+/* Section标题 */
+.section-title {
+  font-family: 'Orbitron', monospace; font-size: clamp(28px, 5vw, 48px);
+  font-weight: 700; letter-spacing: 4px; margin-bottom: 40px;
+  color: var(--fg); text-align: center; position: relative;
+}
+.section-title::before {
+  content: ''; position: absolute; bottom: -10px; left: 50%; transform: translateX(-50%);
+  width: 60px; height: 3px; background: var(--neon-green);
+  box-shadow: 0 0 10px var(--neon-green);
+}
+.section-tag {
+  display: block; font-family: 'Share Tech Mono', monospace; font-size: 12px;
+  color: var(--neon-green); letter-spacing: 4px; margin-bottom: 10px; opacity: 0.6;
+}
+
+/* 统计面板 */
+.stats-row {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 20px; max-width: 1200px; width: 100%; margin-bottom: 80px;
+}
+.stat-box {
+  background: var(--card); border: 1px solid var(--border); padding: 25px;
+  text-align: center; position: relative; overflow: hidden;
+  clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 12px 100%, 0 calc(100% - 12px));
+  transition: all 0.3s;
+}
+.stat-box:hover { border-color: var(--neon-green); box-shadow: 0 0 25px rgba(0,255,136,0.15); }
+.stat-num {
+  font-family: 'Orbitron', monospace; font-size: 42px; font-weight: 900;
+  color: var(--neon-green); text-shadow: 0 0 15px var(--neon-green);
+}
+.stat-box:nth-child(2) .stat-num { color: var(--neon-pink); text-shadow: 0 0 15px var(--neon-pink); }
+.stat-box:nth-child(3) .stat-num { color: var(--neon-cyan); text-shadow: 0 0 15px var(--neon-cyan); }
+.stat-box:nth-child(4) .stat-num { color: var(--neon-yellow); text-shadow: 0 0 15px var(--neon-yellow); }
+.stat-label {
+  font-family: 'Share Tech Mono', monospace; font-size: 12px;
+  color: var(--muted); letter-spacing: 2px; margin-top: 8px;
+}
+
+/* 卡片网格 */
+.card-grid {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 24px; max-width: 1200px; width: 100%; margin-bottom: 80px;
+}
+.card {
+  background: var(--card); border: 1px solid var(--border); padding: 30px;
+  position: relative; overflow: hidden; transition: all 0.3s ease;
+  clip-path: polygon(0 0, calc(100% - 16px) 0, 100% 16px, 100% 100%, 16px 100%, 0 calc(100% - 16px));
+  transform-style: preserve-3d;
+}
+.card::before {
+  content: ''; position: absolute; top: 0; left: -100%; width: 100%; height: 2px;
+  background: linear-gradient(90deg, transparent, var(--neon-green), transparent);
+  transition: left 0.6s ease;
+}
+.card:hover::before { left: 100%; }
+.card:hover { border-color: var(--neon-green); box-shadow: 0 0 30px rgba(0,255,136,0.15), inset 0 0 20px rgba(0,255,136,0.05); }
+.card-icon {
+  font-family: 'Orbitron', monospace; font-size: 36px; font-weight: 900;
+  color: var(--neon-green); margin-bottom: 16px; text-shadow: 0 0 15px var(--neon-green);
+}
+.card:nth-child(2n) .card-icon { color: var(--neon-pink); text-shadow: 0 0 15px var(--neon-pink); }
+.card:nth-child(3n) .card-icon { color: var(--neon-cyan); text-shadow: 0 0 15px var(--neon-cyan); }
+.card:nth-child(5n) .card-icon { color: var(--neon-red); text-shadow: 0 0 15px var(--neon-red); }
+.card-title {
+  font-family: 'Orbitron', monospace; font-size: 18px; font-weight: 700;
+  color: var(--fg); margin-bottom: 10px; letter-spacing: 2px;
+}
+.card-desc { font-size: 13px; color: var(--muted); line-height: 1.6; }
+.card-tag {
+  display: inline-block; font-family: 'Share Tech Mono', monospace; font-size: 10px;
+  color: var(--neon-green); border: 1px solid var(--neon-green); padding: 2px 8px; margin-top: 16px; letter-spacing: 1px;
+}
+.card-bar {
+  margin-top: 16px; height: 4px; background: var(--border); position: relative; overflow: hidden;
+}
+.card-bar-fill {
+  position: absolute; top: 0; left: 0; height: 100%; background: var(--neon-green);
+  box-shadow: 0 0 10px var(--neon-green); transition: width 1s ease;
+}
+
+/* 技能区域 */
+.skills-section { max-width: 1200px; width: 100%; margin-bottom: 80px; }
+.skill-row { margin-bottom: 20px; }
+.skill-header {
+  display: flex; justify-content: space-between; margin-bottom: 8px;
+  font-family: 'Share Tech Mono', monospace; font-size: 13px;
+}
+.skill-name { color: var(--fg); letter-spacing: 1px; }
+.skill-val { color: var(--neon-green); }
+.skill-track {
+  height: 8px; background: var(--card); border: 1px solid var(--border);
+  position: relative; overflow: hidden;
+}
+.skill-fill {
+  height: 100%; background: linear-gradient(90deg, var(--neon-green), var(--neon-cyan));
+  box-shadow: 0 0 15px var(--neon-green); width: 0; transition: width 1.5s ease;
+  position: relative;
+}
+.skill-fill::after {
+  content: ''; position: absolute; top: 0; right: 0; width: 20px; height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.5));
+  animation: skillShine 2s infinite;
+}
+@keyframes skillShine { 0% { transform: translateX(-30px); } 100% { transform: translateX(0); } }
+
+/* 终端窗口 */
+.terminal {
+  max-width: 1200px; width: 100%; background: var(--card); border: 1px solid var(--border);
+  margin-bottom: 80px; font-family: 'Share Tech Mono', monospace; font-size: 13px;
+  position: relative; overflow: hidden;
+}
+.terminal-header {
+  display: flex; align-items: center; gap: 10px; padding: 12px 20px;
+  border-bottom: 1px solid var(--border); background: rgba(0,0,0,0.3);
+}
+.terminal-dot { width: 12px; height: 12px; border-radius: 50%; }
+.terminal-dot:nth-child(1) { background: var(--neon-red); }
+.terminal-dot:nth-child(2) { background: var(--neon-yellow); }
+.terminal-dot:nth-child(3) { background: var(--neon-green); }
+.terminal-title { margin-left: 10px; color: var(--muted); font-size: 12px; letter-spacing: 2px; }
+.terminal-body { padding: 20px; height: 220px; overflow: hidden; line-height: 1.8; color: var(--neon-green); }
+.terminal-line { opacity: 0; animation: fadeIn 0.3s forwards; }
+.terminal-line .prompt { color: var(--neon-cyan); }
+.terminal-line .warn { color: var(--neon-yellow); }
+.terminal-line .err { color: var(--neon-red); }
+@keyframes fadeIn { to { opacity: 1; } }
+
+/* 时间线 */
+.timeline { max-width: 800px; width: 100%; margin-bottom: 80px; position: relative; }
+.timeline::before {
+  content: ''; position: absolute; left: 20px; top: 0; bottom: 0; width: 2px;
+  background: linear-gradient(180deg, var(--neon-green), var(--neon-cyan), var(--neon-pink));
+  box-shadow: 0 0 10px var(--neon-green);
+}
+.timeline-item {
+  display: flex; gap: 30px; margin-bottom: 30px; position: relative; padding-left: 50px;
+}
+.timeline-item::before {
+  content: ''; position: absolute; left: 14px; top: 5px; width: 14px; height: 14px;
+  border-radius: 50%; background: var(--card); border: 2px solid var(--neon-green);
+  box-shadow: 0 0 10px var(--neon-green); transition: all 0.3s;
+}
+.timeline-item:hover::before { background: var(--neon-green); transform: scale(1.3); }
+.timeline-item:nth-child(2)::before { border-color: var(--neon-cyan); box-shadow: 0 0 10px var(--neon-cyan); }
+.timeline-item:nth-child(3)::before { border-color: var(--neon-pink); box-shadow: 0 0 10px var(--neon-pink); }
+.timeline-item:nth-child(4)::before { border-color: var(--neon-yellow); box-shadow: 0 0 10px var(--neon-yellow); }
+.timeline-time {
+  font-family: 'Share Tech Mono', monospace; font-size: 12px; color: var(--neon-green);
+  letter-spacing: 2px; min-width: 80px;
+}
+.timeline-content { flex: 1; }
+.timeline-title {
+  font-family: 'Orbitron', monospace; font-size: 16px; font-weight: 700;
+  color: var(--fg); margin-bottom: 5px; letter-spacing: 1px;
+}
+.timeline-desc { font-size: 13px; color: var(--muted); line-height: 1.5; }
+
+/* 3D旋转方块 */
+.cube-section {
+  display: flex; justify-content: center; gap: 60px; flex-wrap: wrap;
+  margin-bottom: 80px; perspective: 1000px;
+}
+.cube-wrap { width: 100px; height: 100px; perspective: 600px; }
+.cube {
+  width: 100%; height: 100%; position: relative; transform-style: preserve-3d;
+  animation: cubeRotate 8s infinite linear;
+}
+@keyframes cubeRotate {
+  0% { transform: rotateX(0) rotateY(0); }
+  100% { transform: rotateX(360deg) rotateY(360deg); }
+}
+.cube-face {
+  position: absolute; width: 100px; height: 100px;
+  border: 2px solid; display: flex; align-items: center; justify-content: center;
+  font-family: 'Orbitron', monospace; font-size: 24px; font-weight: 900;
+  background: rgba(10,10,15,0.7);
+}
+.cube-face:nth-child(1) { border-color: var(--neon-green); color: var(--neon-green); box-shadow: 0 0 20px rgba(0,255,136,0.3); transform: translateZ(50px); }
+.cube-face:nth-child(2) { border-color: var(--neon-pink); color: var(--neon-pink); box-shadow: 0 0 20px rgba(255,0,255,0.3); transform: rotateY(180deg) translateZ(50px); }
+.cube-face:nth-child(3) { border-color: var(--neon-cyan); color: var(--neon-cyan); box-shadow: 0 0 20px rgba(0,212,255,0.3); transform: rotateY(90deg) translateZ(50px); }
+.cube-face:nth-child(4) { border-color: var(--neon-yellow); color: var(--neon-yellow); box-shadow: 0 0 20px rgba(255,221,0,0.3); transform: rotateY(-90deg) translateZ(50px); }
+.cube-face:nth-child(5) { border-color: var(--neon-red); color: var(--neon-red); box-shadow: 0 0 20px rgba(255,51,102,0.3); transform: rotateX(90deg) translateZ(50px); }
+.cube-face:nth-child(6) { border-color: var(--neon-green); color: var(--neon-green); box-shadow: 0 0 20px rgba(0,255,136,0.3); transform: rotateX(-90deg) translateZ(50px); }
+.cube-label {
+  text-align: center; margin-top: 15px; font-family: 'Share Tech Mono', monospace;
+  font-size: 11px; color: var(--muted); letter-spacing: 2px;
+}
+
+/* 底部 */
+.footer {
+  font-family: 'Share Tech Mono', monospace; font-size: 11px; color: var(--muted);
+  letter-spacing: 3px; text-align: center; padding: 40px 0; width: 100%;
+  border-top: 1px solid var(--border);
+}
+.footer span { color: var(--neon-green); }
+.footer-author {
+  font-family: 'Orbitron', monospace; font-size: 14px; color: var(--neon-cyan);
+  letter-spacing: 5px; margin-bottom: 10px; text-shadow: 0 0 10px var(--neon-cyan);
+}
+
+@media (max-width: 600px) {
+  .nav { padding: 15px 20px; }
+  .nav-links { gap: 15px; }
+  .nav-links a { font-size: 11px; }
+  .timeline-item { flex-direction: column; gap: 5px; }
+}
+</style>
+</head>
+<body>
+
+<div class="grid-bg"></div>
+<canvas id="bgCanvas"></canvas>
+<canvas id="particleCanvas"></canvas>
+<div class="scanline"></div>
+<div class="cursor-dot"></div>
+<div class="cursor-ring"></div>
+
+<nav class="nav">
+  <div class="nav-logo">CYBER_NEXUS</div>
+  <div class="nav-links">
+    <a href="#home">HOME</a>
+    <a href="#stats">STATS</a>
+    <a href="#modules">MODULES</a>
+    <a href="#skills">SKILLS</a>
+    <a href="#log">LOG</a>
+    <a href="#timeline">TIMELINE</a>
+  </div>
+</nav>
+
+<div class="container">
+  <div class="status-bar">
+    <span class="blink">● ONLINE</span>
+    <span>SYS::NEXUS_V2.4</span>
+    <span id="mouseCoord">X:0000 Y:0000</span>
+    <span id="fpsCounter">FPS:60</span>
+    <span id="clock">00:00:00</span>
+    <span id="particleCount">P:0</span>
+  </div>
+
+  <div class="hero" id="home">
+    <h1 class="glitch-title" data-text="CYBER NEXUS">CYBER NEXUS</h1>
+    <p class="subtitle">// INTERACTIVE NEURAL INTERFACE //</p>
+    <p class="author-name">刘半仙</p>
+  </div>
+
+  <span class="section-tag" id="stats">// SYSTEM STATISTICS</span>
+  <h2 class="section-title">核心数据</h2>
+  <div class="stats-row">
+    <div class="stat-box"><div class="stat-num" data-target="128">0</div><div class="stat-label">QUBITS ONLINE</div></div>
+    <div class="stat-box"><div class="stat-num" data-target="102847">0</div><div class="stat-label">EVENTS/SEC</div></div>
+    <div class="stat-box"><div class="stat-num" data-target="99">0</div><div class="stat-label">UPTIME %</div></div>
+    <div class="stat-box"><div class="stat-num" data-target="36">0</div><div class="stat-label">GLOBAL NODES</div></div>
+  </div>
+
+  <span class="section-tag" id="modules">// FUNCTIONAL MODULES</span>
+  <h2 class="section-title">功能模块</h2>
+  <div class="card-grid">
+    <div class="card" data-tilt>
+      <div class="card-icon">01</div>
+      <div class="card-title">NEURAL LINK</div>
+      <div class="card-desc">高速神经接口协议，延迟<0.1ms，支持并行数据流传输与实时反馈。</div>
+      <div class="card-bar"><div class="card-bar-fill" data-fill="92"></div></div>
+      <div class="card-tag">ACTIVE</div>
+    </div>
+    <div class="card" data-tilt>
+      <div class="card-icon">02</div>
+      <div class="card-title">QUANTUM CORE</div>
+      <div class="card-desc">量子计算核心，128-qubit并行处理能力，加密强度突破传统极限。</div>
+      <div class="card-bar"><div class="card-bar-fill" data-fill="87"></div></div>
+      <div class="card-tag">ONLINE</div>
+    </div>
+    <div class="card" data-tilt>
+      <div class="card-icon">03</div>
+      <div class="card-title">DATA STREAM</div>
+      <div class="card-desc">实时数据流监控，每秒处理10万+事件，异常检测准确率99.97%。</div>
+      <div class="card-bar"><div class="card-bar-fill" data-fill="95"></div></div>
+      <div class="card-tag">STREAMING</div>
+    </div>
+    <div class="card" data-tilt>
+      <div class="card-icon">04</div>
+      <div class="card-title">FIREWALL</div>
+      <div class="card-desc">AI驱动防火墙系统，零信任架构，自动识别并阻断未知威胁。</div>
+      <div class="card-bar"><div class="card-bar-fill" data-fill="78"></div></div>
+      <div class="card-tag">SECURED</div>
+    </div>
+    <div class="card" data-tilt>
+      <div class="card-icon">05</div>
+      <div class="card-title">GRID NET</div>
+      <div class="card-desc">分布式网格网络，全球36个节点，自愈合拓扑，99.99%可用性。</div>
+      <div class="card-bar"><div class="card-bar-fill" data-fill="85"></div></div>
+      <div class="card-tag">MESH</div>
+    </div>
+    <div class="card" data-tilt>
+      <div class="card-icon">06</div>
+      <div class="card-title">DEEP SCAN</div>
+      <div class="card-desc">深度扫描引擎，全栈漏洞检测，从固件到云端全覆盖无死角。</div>
+      <div class="card-bar"><div class="card-bar-fill" data-fill="70"></div></div>
+      <div class="card-tag">SCANNING</div>
+    </div>
+  </div>
+
+  <span class="section-tag" id="skills">// CAPABILITY MATRIX</span>
+  <h2 class="section-title">能力矩阵</h2>
+  <div class="skills-section">
+    <div class="skill-row">
+      <div class="skill-header"><span class="skill-name">NEURAL PROCESSING</span><span class="skill-val">94%</span></div>
+      <div class="skill-track"><div class="skill-fill" data-skill="94"></div></div>
+    </div>
+    <div class="skill-row">
+      <div class="skill-header"><span class="skill-name">QUANTUM ENCRYPTION</span><span class="skill-val">88%</span></div>
+      <div class="skill-track"><div class="skill-fill" data-skill="88"></div></div>
+    </div>
+    <div class="skill-row">
+      <div class="skill-header"><span class="skill-name">DEEP LEARNING</span><span class="skill-val">76%</span></div>
+      <div class="skill-track"><div class="skill-fill" data-skill="76"></div></div>
+    </div>
+    <div class="skill-row">
+      <div class="skill-header"><span class="skill-name">EDGE COMPUTING</span><span class="skill-val">91%</span></div>
+      <div class="skill-track"><div class="skill-fill" data-skill="91"></div></div>
+    </div>
+    <div class="skill-row">
+      <div class="skill-header"><span class="skill-name">BLOCKCHAIN SYNC</span><span class="skill-val">82%</span></div>
+      <div class="skill-track"><div class="skill-fill" data-skill="82"></div></div>
+    </div>
+  </div>
+
+  <span class="section-tag">// HOLOGRIC DISPLAY</span>
+  <h2 class="section-title">全息阵列</h2>
+  <div class="cube-section">
+    <div>
+      <div class="cube-wrap"><div class="cube">
+        <div class="cube-face">AI</div><div class="cube-face">ML</div><div class="cube-face">QC</div>
+        <div class="cube-face">NET</div><div class="cube-face">DB</div><div class="cube-face">OS</div>
+      </div></div>
+      <div class="cube-label">CORE MATRIX</div>
+    </div>
+    <div>
+      <div class="cube-wrap"><div class="cube">
+        <div class="cube-face">∞</div><div class="cube-face">π</div><div class="cube-face">Σ</div>
+        <div class="cube-face">Δ</div><div class="cube-face">Ω</div><div class="cube-face">Ψ</div>
+      </div></div>
+      <div class="cube-label">QUANTUM FIELD</div>
+    </div>
+    <div>
+      <div class="cube-wrap"><div class="cube">
+        <div class="cube-face">01</div><div class="cube-face">10</div><div class="cube-face">11</div>
+        <div class="cube-face">00</div><div class="cube-face">FF</div><div class="cube-face">7F</div>
+      </div></div>
+      <div class="cube-label">DATA STREAM</div>
+    </div>
+  </div>
+
+  <span class="section-tag" id="log">// SYSTEM TERMINAL</span>
+  <h2 class="section-title">系统终端</h2>
+  <div class="terminal">
+    <div class="terminal-header">
+      <div class="terminal-dot"></div><div class="terminal-dot"></div><div class="terminal-dot"></div>
+      <div class="terminal-title">root@nexus:~#</div>
+    </div>
+    <div class="terminal-body" id="terminalBody"></div>
+  </div>
+
+  <span class="section-tag" id="timeline">// EVENT TIMELINE</span>
+  <h2 class="section-title">事件时间线</h2>
+  <div class="timeline">
+    <div class="timeline-item">
+      <div class="timeline-time">T+00:00</div>
+      <div class="timeline-content">
+        <div class="timeline-title">SYSTEM BOOT</div>
+        <div class="timeline-desc">NEXUS核心启动，128个量子比特校准完毕，神经接口连接建立。</div>
+      </div>
+    </div>
+    <div class="timeline-item">
+      <div class="timeline-time">T+00:03</div>
+      <div class="timeline-content">
+        <div class="timeline-title">GRID SYNC</div>
+        <div class="timeline-desc">全球36个网格节点同步完成，拓扑结构自愈合，延迟<0.1ms。</div>
+      </div>
+    </div>
+    <div class="timeline-item">
+      <div class="timeline-time">T+00:07</div>
+      <div class="timeline-content">
+        <div class="timeline-title">DEEP SCAN INIT</div>
+        <div class="timeline-desc">深度扫描引擎启动，全栈漏洞检测覆盖率100%，0个高危漏洞。</div>
+      </div>
+    </div>
+    <div class="timeline-item">
+      <div class="timeline-time">T+00:12</div>
+      <div class="timeline-content">
+        <div class="timeline-title">AI MODEL LOAD</div>
+        <div class="timeline-desc">NEXUS-7B模型加载完毕，推理延迟23ms，准确率99.97%。</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer">
+    <div class="footer-author">刘半仙</div>
+    <span>◆</span> CYBER NEXUS INTERFACE v2.4.1 <span>◆</span> POWERED BY NEURAL GRID <span>◆</span><br>
+    <span>◆</span> © 2026 ALL SYSTEMS OPERATIONAL <span>◆</span>
+  </div>
+</div>
+
+<script>
+// 光标
+const cursorDot = document.querySelector('.cursor-dot');
+const cursorRing = document.querySelector('.cursor-ring');
+let mouseX = 0, mouseY = 0, ringX = 0, ringY = 0;
+
+document.addEventListener('mousemove', (e) => {
+  mouseX = e.clientX; mouseY = e.clientY;
+  cursorDot.style.left = mouseX - 4 + 'px';
+  cursorDot.style.top = mouseY - 4 + 'px';
+  document.getElementById('mouseCoord').textContent =
+    `X:${String(Math.round(mouseX)).padStart(4,'0')} Y:${String(Math.round(mouseY)).padStart(4,'0')}`;
+});
+
+function updateRing() {
+  ringX += (mouseX - ringX) * 0.15;
+  ringY += (mouseY - ringY) * 0.15;
+  cursorRing.style.left = ringX - 20 + 'px';
+  cursorRing.style.top = ringY - 20 + 'px';
+  requestAnimationFrame(updateRing);
+}
+updateRing();
+
+document.querySelectorAll('.card, .glitch-title, .stat-box, .timeline-item').forEach(el => {
+  el.addEventListener('mouseenter', () => {
+    cursorRing.style.width = '60px'; cursorRing.style.height = '60px';
+    cursorRing.style.borderColor = '#ff00ff';
+    cursorRing.style.boxShadow = '0 0 25px #ff00ff';
+  });
+  el.addEventListener('mouseleave', () => {
+    cursorRing.style.width = '40px'; cursorRing.style.height = '40px';
+    cursorRing.style.borderColor = '#00d4ff';
+    cursorRing.style.boxShadow = '0 0 15px #00d4ff';
+  });
+});
+
+// 粒子
+const canvas = document.getElementById('particleCanvas');
+const ctx = canvas.getContext('2d');
+const bgCanvas = document.getElementById('bgCanvas');
+const bgCtx = bgCanvas.getContext('2d');
+canvas.width = bgCanvas.width = window.innerWidth;
+canvas.height = bgCanvas.height = window.innerHeight;
+
+let particles = [];
+const colors = ['#00ff88', '#ff00ff', '#00d4ff'];
+
+document.addEventListener('mousemove', (e) => {
+  for (let i = 0; i < 3; i++) {
+    particles.push({
+      x: e.clientX, y: e.clientY,
+      vx: (Math.random() - 0.5) * 4, vy: (Math.random() - 0.5) * 4,
+      life: 1, size: Math.random() * 3 + 1,
+      color: colors[Math.floor(Math.random() * colors.length)]
+    });
+  }
+});
+
+// 背景星星
+const stars = [];
+for (let i = 0; i < 150; i++) {
+  stars.push({
+    x: Math.random() * bgCanvas.width, y: Math.random() * bgCanvas.height,
+    size: Math.random() * 1.5 + 0.5, alpha: Math.random() * 0.5 + 0.2,
+    twinkle: Math.random() * Math.PI * 2, speed: Math.random() * 0.02 + 0.01
+  });
+}
+
+// 背景流动线
+const flowLines = [];
+for (let i = 0; i < 8; i++) {
+  flowLines.push({
+    y: Math.random() * bgCanvas.height, speed: Math.random() * 0.5 + 0.2,
+    color: colors[Math.floor(Math.random() * colors.length)],
+    offset: 0
+  });
+}
+
+let lastTime = performance.now(), frames = 0;
+
+function animate() {
+  // 背景
+  bgCtx.clearRect(0, 0, bgCanvas.width, bgCanvas.height);
+  stars.forEach(s => {
+    s.twinkle += s.speed;
+    const a = s.alpha * (0.5 + 0.5 * Math.sin(s.twinkle));
+    bgCtx.globalAlpha = a;
+    bgCtx.fillStyle = '#00ff88';
+    bgCtx.beginPath();
+    bgCtx.arc(s.x, s.y, s.size, 0, Math.PI * 2);
+    bgCtx.fill();
+  });
+  flowLines.forEach(l => {
+    l.offset += l.speed;
+    if (l.offset > bgCanvas.width + 200) l.offset = -200;
+    bgCtx.globalAlpha = 0.15;
+    bgCtx.strokeStyle = l.color;
+    bgCtx.lineWidth = 1;
+    bgCtx.beginPath();
+    bgCtx.moveTo(l.offset, l.y);
+    bgCtx.lineTo(l.offset + 100, l.y);
+    bgCtx.stroke();
+  });
+  bgCtx.globalAlpha = 1;
+
+  // 粒子
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  particles = particles.filter(p => p.life > 0);
+  particles.forEach(p => {
+    p.x += p.vx; p.y += p.vy; p.life -= 0.02;
+    p.vx *= 0.98; p.vy *= 0.98;
+    ctx.globalAlpha = p.life;
+    ctx.fillStyle = p.color;
+    ctx.shadowBlur = 15; ctx.shadowColor = p.color;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+    ctx.fill();
+  });
+  ctx.globalAlpha = 1; ctx.shadowBlur = 0;
+
+  document.getElementById('particleCount').textContent = `P:${particles.length}`;
+
+  frames++;
+  const now = performance.now();
+  if (now - lastTime >= 1000) {
+    document.getElementById('fpsCounter').textContent = `FPS:${Math.round(frames * 1000 / (now - lastTime))}`;
+    frames = 0; lastTime = now;
+  }
+  requestAnimationFrame(animate);
+}
+animate();
+
+window.addEventListener('resize', () => {
+  canvas.width = bgCanvas.width = window.innerWidth;
+  canvas.height = bgCanvas.height = window.innerHeight;
+});
+
+// 网格视差
+const gridBg = document.querySelector('.grid-bg');
+document.addEventListener('mousemove', (e) => {
+  const x = (e.clientX / window.innerWidth - 0.5) * 30;
+  const y = (e.clientY / window.innerHeight - 0.5) * 30;
+  gridBg.style.transform = `translate(${x}px, ${y}px)`;
+});
+
+// 卡片3D倾斜
+document.querySelectorAll('[data-tilt]').forEach(card => {
+  card.addEventListener('mousemove', (e) => {
+    const rect = card.getBoundingClientRect();
+    const tiltX = ((e.clientY - rect.top - rect.height/2) / (rect.height/2)) * -8;
+    const tiltY = ((e.clientX - rect.left - rect.width/2) / (rect.width/2)) * 8;
+    card.style.transform = `perspective(1000px) rotateX(${tiltX}deg) rotateY(${tiltY}deg) translateY(-4px)`;
+  });
+  card.addEventListener('mouseleave', () => { card.style.transform = ''; });
+});
+
+// 时钟
+function updateClock() {
+  const n = new Date();
+  document.getElementById('clock').textContent =
+    `${String(n.getHours()).padStart(2,'0')}:${String(n.getMinutes()).padStart(2,'0')}:${String(n.getSeconds()).padStart(2,'0')}`;
+}
+setInterval(updateClock, 1000); updateClock();
+
+// 数字滚动
+function animateNumber(el, target, duration = 2000) {
+  const start = 0, startTime = performance.now();
+  function step(now) {
+    const p = Math.min((now - startTime) / duration, 1);
+    const val = Math.floor(start + (target - start) * (1 - Math.pow(1 - p, 3)));
+    el.textContent = val.toLocaleString();
+    if (p < 1) requestAnimationFrame(step);
+  }
+  requestAnimationFrame(step);
+}
+
+// IntersectionObserver触发动画
+const observer = new IntersectionObserver((entries) => {
+  entries.forEach(entry => {
+    if (entry.isIntersecting) {
+      if (entry.target.classList.contains('stat-num')) {
+        animateNumber(entry.target, parseInt(entry.target.dataset.target));
+      }
+      if (entry.target.classList.contains('skill-fill')) {
+        entry.target.style.width = entry.target.dataset.skill + '%';
+      }
+      if (entry.target.classList.contains('card-bar-fill')) {
+        entry.target.style.width = entry.target.dataset.fill + '%';
+      }
+      observer.unobserve(entry.target);
+    }
+  });
+}, { threshold: 0.3 });
+
+document.querySelectorAll('.stat-num').forEach(el => observer.observe(el));
+document.querySelectorAll('.skill-fill').forEach(el => observer.observe(el));
+document.querySelectorAll('.card-bar-fill').forEach(el => observer.observe(el));
+
+// 终端日志
+const terminalBody = document.getElementById('terminalBody');
+const messages = [
+  { text: 'Booting NEXUS core...', type: 'normal' },
+  { text: 'Quantum calibration: 128/128 qubits OK', type: 'normal' },
+  { text: 'Neural link established [0.08ms]', type: 'normal' },
+  { text: 'Loading AI model NEXUS-7B...', type: 'normal' },
+  { text: 'Model loaded: 23ms inference latency', type: 'normal' },
+  { text: 'Grid sync: 36/36 nodes online', type: 'normal' },
+  { text: 'WARNING: High traffic detected on node TOKYO-01', type: 'warn' },
+  { text: 'Auto-scaling: +3 instances spawned', type: 'normal' },
+  { text: 'Deep scan: 0 critical, 2 low vulnerabilities', type: 'normal' },
+  { text: 'Firewall: 147 threats blocked today', type: 'normal' },
+  { text: 'Encryption: AES-256 + Quantum OTP active', type: 'normal' },
+  { text: 'ERROR: Node LONDON-04 timeout, retrying...', type: 'err' },
+  { text: 'Recovery: LONDON-04 reconnected [OK]', type: 'normal' },
+  { text: 'Memory: 224.3TB / 256TB available', type: 'normal' },
+  { text: 'All systems operational.', type: 'normal' },
+];
+
+let msgIndex = 0;
+function addTerminalLine() {
+  const msg = messages[msgIndex % messages.length];
+  const line = document.createElement('div');
+  line.className = 'terminal-line';
+  const cls = msg.type === 'warn' ? 'warn' : msg.type === 'err' ? 'err' : '';
+  line.innerHTML = `<span class="prompt">root@nexus:~$</span> <span class="${cls}">${msg.text}</span>`;
+  terminalBody.appendChild(line);
+  msgIndex++;
+  if (terminalBody.children.length > 9) terminalBody.children[0].remove();
+}
+setInterval(addTerminalLine, 700);
+for (let i = 0; i < 6; i++) addTerminalLine();
+
+// 点击爆炸
+document.addEventListener('click', (e) => {
+  for (let i = 0; i < 50; i++) {
+    const angle = (Math.PI * 2 * i) / 50;
+    const speed = Math.random() * 8 + 2;
+    particles.push({
+      x: e.clientX, y: e.clientY,
+      vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed,
+      life: 1, size: Math.random() * 4 + 2,
+      color: colors[Math.floor(Math.random() * colors.length)]
+    });
+  }
+});
+</script>
+</body>
+</html>

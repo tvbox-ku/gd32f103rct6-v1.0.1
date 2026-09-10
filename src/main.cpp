@@ -36,7 +36,6 @@ const uint8_t ADC1_PIN = PC2, ADC2_PIN = PC3;
 const int8_t TFT_BL_PIN = PC6;
 const uint8_t TEMP_ADC_CH = 15, PRESS_ADC_CH = 14;
 const uint8_t ADC1_CH = 12, ADC2_CH = 13;
-
 #define W 480
 #define H 320
 
@@ -1318,7 +1317,7 @@ void drawDebugConfirmScreen() {
   snprintf(buf, sizeof(buf), "%02d", (int)tempVal);
   drawMixedString("温度:", 230, 160, TFT_WHITE, 1.0f);
   drawAsciiString24(buf, 310, 160, TFT_WHITE);
-  drawMixedString("℃", 335, 160, TFT_WHITE, 1.0f);
+  drawMixedString("℃", 360, 160, TFT_WHITE, 1.0f);
 
   // 底部单个按钮居中：红色"返回主页"(KEY1/KEY3)
   int btnW = 150, btnH = 40, btnY = 230;
@@ -2320,8 +2319,8 @@ void loop() {
     }
   }
 
-  // 告警时唤醒屏幕
-  if (screenSleeping && hasSafetyAlert()) {
+  // 告警时唤醒屏幕（仅系统运行中）
+  if (screenSleeping && systemActive && hasSafetyAlert()) {
     setBacklight(true);
     screenSleeping = false;
     idleTimer = millis();
